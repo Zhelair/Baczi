@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Sparkles } from 'lucide-react'
-import { loadAuth } from '../utils/storage'
+import { Send, Sparkles, History, Download, Trash2, FolderOpen, X, Save } from 'lucide-react'
+import { loadAuth, loadChatSessions, saveChatSessions, type ChatSession } from '../utils/storage'
 import type { BaziChart } from '../engine/types'
 import type { Language } from '../engine/types'
 
@@ -41,12 +41,52 @@ const PLACEHOLDER: Record<Language, string> = {
   en: 'Ask about your chart...',
 }
 
+function downloadJson(data: unknown, filename: string) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function AskBazi({ chart, lang }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showHistory, setShowHistory] = useState(false)
+  const [sessions, setSessions] = useState<ChatSession[]>(() => loadChatSessions())
+  const [saveName, setSaveName] = useState('')
+  const [showSaveInput, setShowSaveInput] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  function saveSession() {
+    const name = saveName.trim() || new Date().toLocaleDateString(lang === 'bg' ? 'bg-BG' : lang === 'ru' ? 'ru-RU' : 'en-GB')
+    const session: ChatSession = {
+      id: Date.now().toString(),
+      name,
+      date: new Date().toISOString().split('T')[0],
+      messages,
+    }
+    const updated = [session, ...sessions]
+    saveChatSessions(updated)
+    setSessions(updated)
+    setSaveName('')
+    setShowSaveInput(false)
+  }
+
+  function deleteSession(id: string) {
+    const updated = sessions.filter(s => s.id !== id)
+    saveChatSessions(updated)
+    setSessions(updated)
+  }
+
+  function loadSession(session: ChatSession) {
+    setMessages(session.messages)
+    setShowHistory(false)
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -117,18 +157,114 @@ export default function AskBazi({ chart, lang }: Props) {
   const empty = messages.length === 0
 
   return (
-    <div className="flex flex-col h-screen pb-20">
+    <div className="flex flex-col h-screen pb-20 md:pb-0 max-w-3xl mx-auto w-full">
       {/* Header */}
       <div className="px-4 pt-6 pb-3 flex-shrink-0">
-        <div className="flex items-center gap-2 mb-1">
-          <Sparkles size={16} className="text-amber-400" />
-          <h2 className="text-lg font-semibold text-zinc-100">
-            {lang === 'bg' ? 'Попитай картата' : lang === 'ru' ? 'Спроси карту' : 'Ask your chart'}
-          </h2>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-amber-400" />
+            <h2 className="text-lg font-semibold text-zinc-100">
+              {lang === 'bg' ? 'Попитай картата' : lang === 'ru' ? 'Спроси карту' : 'Ask your chart'}
+            </h2>
+          </div>
+          <div className="flex items-center gap-1">
+            {messages.length > 0 && (
+              <button
+                onClick={() => setShowSaveInput(v => !v)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                title={lang === 'bg' ? 'Запази сесията' : lang === 'ru' ? 'Сохранить сессию' : 'Save session'}
+              >
+                <Save size={13} />
+                {lang === 'bg' ? 'Запази' : lang === 'ru' ? 'Сохранить' : 'Save'}
+              </button>
+            )}
+            <button
+              onClick={() => setShowHistory(v => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                showHistory ? 'bg-amber-500/10 text-amber-400' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+              }`}
+              title={lang === 'bg' ? 'История' : lang === 'ru' ? 'История' : 'History'}
+            >
+              <History size={13} />
+              {sessions.length > 0 && (
+                <span className="bg-amber-500 text-black text-xs font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  {sessions.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
         <p className="text-xs text-zinc-500">
           {lang === 'bg' ? '15 жетона на въпрос' : lang === 'ru' ? '15 токенов за вопрос' : '15 tokens per question'}
         </p>
+        {showSaveInput && (
+          <div className="mt-3 flex gap-2">
+            <input
+              autoFocus
+              type="text"
+              placeholder={lang === 'bg' ? 'Име на сесията...' : lang === 'ru' ? 'Название сессии...' : 'Session name...'}
+              value={saveName}
+              onChange={e => setSaveName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveSession()}
+              className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-amber-500 transition-colors"
+            />
+            <button onClick={saveSession} className="px-3 py-1.5 rounded-lg bg-amber-500 text-black text-sm font-medium hover:bg-amber-400 transition-colors">
+              {lang === 'bg' ? 'ОК' : lang === 'ru' ? 'ОК' : 'OK'}
+            </button>
+            <button onClick={() => setShowSaveInput(false)} className="px-2 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 transition-colors">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        {showHistory && (
+          <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
+            <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+              <span className="text-sm font-medium text-zinc-200">
+                {lang === 'bg' ? 'Запазени сесии' : lang === 'ru' ? 'Сохранённые сессии' : 'Saved sessions'}
+              </span>
+              <button onClick={() => setShowHistory(false)} className="text-zinc-600 hover:text-zinc-400">
+                <X size={14} />
+              </button>
+            </div>
+            {sessions.length === 0 ? (
+              <p className="px-4 py-6 text-center text-xs text-zinc-600">
+                {lang === 'bg' ? 'Няма запазени сесии' : lang === 'ru' ? 'Нет сохранённых сессий' : 'No saved sessions yet'}
+              </p>
+            ) : (
+              <div className="max-h-64 overflow-y-auto divide-y divide-zinc-800">
+                {sessions.map(s => (
+                  <div key={s.id} className="flex items-center gap-2 px-4 py-3 hover:bg-zinc-800/50 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-zinc-200 truncate">{s.name}</p>
+                      <p className="text-xs text-zinc-600">{s.date} · {s.messages.length} {lang === 'bg' ? 'съобщения' : lang === 'ru' ? 'сообщений' : 'messages'}</p>
+                    </div>
+                    <button
+                      onClick={() => loadSession(s)}
+                      className="p-1.5 text-zinc-500 hover:text-amber-400 transition-colors"
+                      title={lang === 'bg' ? 'Зареди' : lang === 'ru' ? 'Загрузить' : 'Load'}
+                    >
+                      <FolderOpen size={14} />
+                    </button>
+                    <button
+                      onClick={() => downloadJson(s, `bazi-${s.name.replace(/\s+/g, '-')}.json`)}
+                      className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-colors"
+                      title={lang === 'bg' ? 'Изтегли' : lang === 'ru' ? 'Скачать' : 'Download'}
+                    >
+                      <Download size={14} />
+                    </button>
+                    <button
+                      onClick={() => deleteSession(s.id)}
+                      className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors"
+                      title={lang === 'bg' ? 'Изтрий' : lang === 'ru' ? 'Удалить' : 'Delete'}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Messages */}

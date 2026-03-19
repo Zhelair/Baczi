@@ -73,7 +73,7 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
   }
 
   return (
-    <div className="pb-24 px-4 pt-6 max-w-lg mx-auto">
+    <div className="pb-24 md:pb-8 px-4 pt-6 max-w-2xl mx-auto">
       <h2 className="text-lg font-semibold text-zinc-100 mb-6">{t('settings', lang)}</h2>
 
       {/* Profile info */}

@@ -1,10 +1,18 @@
 import type { UserProfile, AuthState, DailyReading } from '../engine/types'
 
+export interface ChatSession {
+  id: string
+  name: string
+  date: string        // ISO date
+  messages: { role: 'user' | 'assistant'; content: string }[]
+}
+
 const KEYS = {
   AUTH:        'baczi_auth',
   PROFILE:     'baczi_profile',
   READING:     'baczi_reading',  // { date, data }
   ADMIN_TOKEN: 'baczi_admin_token',
+  SESSIONS:    'baczi_sessions',
 } as const
 
 export function saveAuth(auth: AuthState) {
@@ -67,6 +75,16 @@ export function loadAdminToken(): string | null {
 
 export function clearAdminToken() {
   localStorage.removeItem(KEYS.ADMIN_TOKEN)
+}
+
+export function loadChatSessions(): ChatSession[] {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.SESSIONS) ?? '[]') as ChatSession[]
+  } catch { return [] }
+}
+
+export function saveChatSessions(sessions: ChatSession[]) {
+  localStorage.setItem(KEYS.SESSIONS, JSON.stringify(sessions))
 }
 
 export function clearAll() {

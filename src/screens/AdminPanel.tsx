@@ -137,7 +137,7 @@ export default function AdminPanel({ adminToken }: { adminToken?: string } = {})
   }
 
   return (
-    <div className="pb-28 px-4 pt-6 max-w-lg mx-auto">
+    <div className="pb-28 md:pb-8 px-4 pt-6 max-w-2xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>

@@ -22,7 +22,7 @@ export default function MyChart({ profile, lang }: Props) {
     })
 
   return (
-    <div className="pb-24 px-4 pt-6 max-w-lg mx-auto">
+    <div className="pb-24 md:pb-8 px-4 pt-6 max-w-2xl mx-auto">
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-zinc-100">{profile.name}</h2>
