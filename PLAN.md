@@ -26,7 +26,8 @@ No scraping. No database. No stored personal data. Fully legal. Fully private.
 | BaZi Engine | `lunar-javascript` (JS library) | Complete Chinese calendar, well-tested |
 | AI | DeepSeek V3 API | ~10x cheaper than Claude, excellent quality |
 | API Proxy | Vercel Serverless Functions (free tier) | Hides DeepSeek API key from frontend |
-| Storage | `localStorage` / `IndexedDB` | 100% client-side, no server storage |
+| Storage | `localStorage` | 100% client-side, no personal data on server |
+| Rate limiting | Vercel KV (free tier) | Daily counters only, resets UTC midnight |
 | Icons | Lucide React | Consistent with other projects |
 
 ---
@@ -291,8 +292,9 @@ baczi/
 │       └── dateHelpers.ts
 │
 └── api/
-    └── interpret.ts               ← Vercel serverless function
-                                      (DeepSeek proxy, stateless)
+    ├── auth.ts                    ← verify passphrase → return JWT with tier
+    └── interpret.ts               ← validate JWT + rate limit (Vercel KV)
+                                      → call DeepSeek → return reading
 ```
 
 ---
@@ -327,19 +329,40 @@ baczi/
 
 ---
 
-## Authentication — Passphrase System
+## Authentication — Passphrase + Tier System
 
-Simple shared-secret gate. Mom shares the passphrase with paying customers.
+Mom shares passphrases with customers. Each tier has its own passphrase.
+Multiple people can share a passphrase, but the daily limit is shared too.
 
-**Flow:**
+### Tiers
+
+| Tier | Daily Limit | Features |
+|------|-------------|----------|
+| FREE | 5 uses/day | Basic chart + today's reading |
+| PRO  | 30 uses/day | + Lucky dates calendar |
+| MAX  | 100 uses/day | + Monthly forecast (Phase 2) |
+
+### Auth Flow
 ```
 1. User opens app → sees passphrase prompt
 2. Enters passphrase → POST /api/auth
-3. Vercel checks: passphrase === process.env.APP_PASSPHRASE
-4. ✅ Match → returns signed session token (JWT, 30-day expiry)
-5. Token stored in localStorage
-6. All subsequent API calls include token in Authorization header
-7. ❌ Wrong passphrase → "Invalid passphrase" error
+3. Vercel checks passphrase against FREE/PRO/MAX env vars
+4. ✅ Match → returns JWT containing { tier, exp: 30 days }
+5. JWT stored in localStorage
+6. Every API call: Authorization: Bearer <token>
+7. Server validates JWT + checks rate limit in Vercel KV
+8. ❌ Limit exceeded → 429 "Daily limit reached, resets at midnight UTC"
+```
+
+### Rate Limiting (Vercel KV — free tier)
+```
+Stores ONLY daily counters (no personal data):
+  rate:free:2026-03-19 → 12
+  rate:pro:2026-03-19  → 47
+  rate:max:2026-03-19  → 3
+
+Resets: UTC midnight (simple, reliable)
+Storage: ~100 bytes/day total — well within Vercel KV free tier
 ```
 
 **No API keys are ever in the frontend bundle. Ever.**
@@ -351,8 +374,16 @@ Simple shared-secret gate. Mom shares the passphrase with paying customers.
 ```env
 # Vercel env vars only — never committed to git, never in frontend
 DEEPSEEK_API_KEY=sk-...
-APP_PASSPHRASE=some-secret-your-mom-shares
-JWT_SECRET=another-random-secret-for-signing-tokens
+JWT_SECRET=random-long-secret-for-signing-tokens
+
+# One passphrase per tier — mom shares these with customers
+FREE_PASSPHRASE=free-trial-word
+PRO_PASSPHRASE=pro-access-word
+MAX_PASSPHRASE=vip-access-word
+
+# Vercel KV connection (auto-populated by Vercel when KV is linked)
+KV_REST_API_URL=...
+KV_REST_API_TOKEN=...
 ```
 
 ---
