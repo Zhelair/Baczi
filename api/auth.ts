@@ -1,12 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { SignJWT } from 'jose'
 import { createHash } from 'crypto'
-import { Redis } from '@upstash/redis'
+import { createClient } from '@supabase/supabase-js'
 
-const kv = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-})
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 type Tier = 'free' | 'pro' | 'max'
 
@@ -38,21 +38,24 @@ function nextMonthReset(): string {
 }
 
 async function getOrInitBalance(hash: string, tier: Tier) {
-  const key = `tokens:${hash}`
-  let record = await kv.get<{ balance: number; tier: Tier; resetDate: string }>(key)
-
   const today = new Date().toISOString().split('T')[0]
 
-  if (!record) {
-    record = { balance: MONTHLY_TOKENS[tier], tier, resetDate: nextMonthReset() }
-    await kv.set(key, record)
-  } else if (record.resetDate <= today) {
-    // New month — refill
-    record = { balance: MONTHLY_TOKENS[tier], tier, resetDate: nextMonthReset() }
-    await kv.set(key, record)
+  const { data } = await supabase
+    .from('token_balances')
+    .select('balance, tier, reset_date')
+    .eq('passphrase_hash', hash)
+    .single()
+
+  if (!data || data.reset_date <= today) {
+    // First use or new month — upsert with fresh balance
+    const fresh = { balance: MONTHLY_TOKENS[tier], tier, reset_date: nextMonthReset() }
+    await supabase
+      .from('token_balances')
+      .upsert({ passphrase_hash: hash, ...fresh, updated_at: new Date().toISOString() })
+    return { balance: fresh.balance, resetDate: fresh.reset_date }
   }
 
-  return record
+  return { balance: data.balance, resetDate: data.reset_date }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
