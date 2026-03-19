@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { jwtVerify } from 'jose'
-import { Redis } from '@upstash/redis'
+import { createClient } from '@supabase/supabase-js'
 
-const kv = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-})
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 type Tier = 'free' | 'pro' | 'max'
 type ActionType = 'daily_reading' | 'luck_check' | 'lucky_dates'
@@ -29,23 +29,32 @@ function nextMonthReset(): string {
 }
 
 async function deductTokens(hash: string, tier: Tier, cost: number): Promise<{ ok: boolean; balance: number }> {
-  const key = `tokens:${hash}`
   const today = new Date().toISOString().split('T')[0]
-  let record = await kv.get<{ balance: number; tier: Tier; resetDate: string }>(key)
 
-  if (!record) {
-    record = { balance: MONTHLY_TOKENS[tier], tier, resetDate: nextMonthReset() }
-  } else if (record.resetDate <= today) {
-    record = { balance: MONTHLY_TOKENS[tier], tier, resetDate: nextMonthReset() }
+  const { data } = await supabase
+    .from('token_balances')
+    .select('balance, reset_date')
+    .eq('passphrase_hash', hash)
+    .single()
+
+  let balance = data && data.reset_date > today ? data.balance : MONTHLY_TOKENS[tier]
+
+  if (balance < cost) {
+    return { ok: false, balance }
   }
 
-  if (record.balance < cost) {
-    return { ok: false, balance: record.balance }
-  }
+  balance -= cost
+  await supabase
+    .from('token_balances')
+    .upsert({
+      passphrase_hash: hash,
+      tier,
+      balance,
+      reset_date: data && data.reset_date > today ? data.reset_date : nextMonthReset(),
+      updated_at: new Date().toISOString(),
+    })
 
-  record.balance -= cost
-  await kv.set(key, record)
-  return { ok: true, balance: record.balance }
+  return { ok: true, balance }
 }
 
 async function callDeepSeek(prompt: string): Promise<string> {
