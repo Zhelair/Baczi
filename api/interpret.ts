@@ -36,13 +36,14 @@ async function fetchRelevantKnowledge(chart: Record<string, unknown>): Promise<s
   const tags = extractPinyinTags(chart)
   if (tags.length === 0) return ''
 
+  const { bazi } = await getConfig()
   const { data, error } = await supabase
     .from('bazi_knowledge')
     .select('pattern, rule_text, school, confidence')
     .overlaps('tags', tags)
-    .in('confidence', ['high', 'medium'])
+    .in('confidence', bazi.confidenceLevels)
     .order('confidence', { ascending: true }) // high first (alphabetically h < m)
-    .limit(6)
+    .limit(bazi.knowledgeLimit)
 
   if (error || !data || data.length === 0) return ''
 
@@ -52,19 +53,68 @@ async function fetchRelevantKnowledge(chart: Record<string, unknown>): Promise<s
   return `Classical BaZi knowledge relevant to this chart:\n${lines.join('\n')}`
 }
 
-type Tier = 'free' | 'pro' | 'max'
+type Tier = 'free' | 'pro' | 'max' | 'admin'
 type ActionType = 'daily_reading' | 'luck_check' | 'lucky_dates'
 
-const TOKEN_COSTS: Record<ActionType, number> = {
+// Default costs/limits — overridden by app_config when admin tunes them
+const DEFAULT_TOKEN_COSTS: Record<ActionType, number> = {
   daily_reading: 50,
   luck_check: 20,
   lucky_dates: 30,
 }
 
-const MONTHLY_TOKENS: Record<Tier, number> = {
+const DEFAULT_MONTHLY_TOKENS: Record<Tier, number> = {
   free: 500,
   pro: 2000,
   max: 10000,
+  admin: 999999,
+}
+
+interface AiConfig {
+  model: string
+  temperature: number
+  maxTokens: number
+  systemPromptExtra: string
+}
+
+interface BaziConfig {
+  tokenCosts: Record<ActionType, number>
+  monthlyTokens: Record<Tier, number>
+  knowledgeLimit: number
+  confidenceLevels: string[]
+}
+
+// Cache config for 60 s to avoid Supabase overhead on every request
+let configCache: { ai: AiConfig; bazi: BaziConfig; ts: number } | null = null
+
+async function getConfig(): Promise<{ ai: AiConfig; bazi: BaziConfig }> {
+  if (configCache && Date.now() - configCache.ts < 60_000) {
+    return { ai: configCache.ai, bazi: configCache.bazi }
+  }
+  try {
+    const { data } = await supabase.from('app_config').select('key, value')
+    const map: Record<string, unknown> = {}
+    for (const row of data ?? []) map[row.key] = row.value
+    const ai: AiConfig = {
+      model:             (map.ai as AiConfig | undefined)?.model             ?? 'deepseek-chat',
+      temperature:       (map.ai as AiConfig | undefined)?.temperature       ?? 0.7,
+      maxTokens:         (map.ai as AiConfig | undefined)?.maxTokens         ?? 1500,
+      systemPromptExtra: (map.ai as AiConfig | undefined)?.systemPromptExtra ?? '',
+    }
+    const bazi: BaziConfig = {
+      tokenCosts:       (map.bazi as BaziConfig | undefined)?.tokenCosts       ?? DEFAULT_TOKEN_COSTS,
+      monthlyTokens:    (map.bazi as BaziConfig | undefined)?.monthlyTokens    ?? DEFAULT_MONTHLY_TOKENS,
+      knowledgeLimit:   (map.bazi as BaziConfig | undefined)?.knowledgeLimit   ?? 6,
+      confidenceLevels: (map.bazi as BaziConfig | undefined)?.confidenceLevels ?? ['high', 'medium'],
+    }
+    configCache = { ai, bazi, ts: Date.now() }
+    return { ai, bazi }
+  } catch {
+    return {
+      ai:   { model: 'deepseek-chat', temperature: 0.7, maxTokens: 1500, systemPromptExtra: '' },
+      bazi: { tokenCosts: DEFAULT_TOKEN_COSTS, monthlyTokens: DEFAULT_MONTHLY_TOKENS, knowledgeLimit: 6, confidenceLevels: ['high', 'medium'] },
+    }
+  }
 }
 
 function nextMonthReset(): string {
@@ -82,7 +132,9 @@ async function deductTokens(hash: string, tier: Tier, cost: number): Promise<{ o
     .eq('passphrase_hash', hash)
     .single()
 
-  let balance = data && data.reset_date > today ? data.balance : MONTHLY_TOKENS[tier]
+  const { bazi: baziCfg } = await getConfig()
+  const monthlyTokens = baziCfg.monthlyTokens
+  let balance = data && data.reset_date > today ? data.balance : (monthlyTokens[tier] ?? DEFAULT_MONTHLY_TOKENS[tier])
 
   if (balance < cost) {
     return { ok: false, balance }
@@ -102,9 +154,12 @@ async function deductTokens(hash: string, tier: Tier, cost: number): Promise<{ o
   return { ok: true, balance }
 }
 
-async function callDeepSeek(prompt: string, systemPrompt?: string): Promise<string> {
+async function callDeepSeek(prompt: string, systemPrompt?: string, aiCfg?: AiConfig): Promise<string> {
+  const cfg = aiCfg ?? { model: 'deepseek-chat', temperature: 0.7, maxTokens: 1500, systemPromptExtra: '' }
   const messages: Array<{ role: string; content: string }> = []
-  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt })
+
+  const fullSystem = [systemPrompt, cfg.systemPromptExtra].filter(Boolean).join('\n\n')
+  if (fullSystem) messages.push({ role: 'system', content: fullSystem })
   messages.push({ role: 'user', content: prompt })
 
   const response = await fetch('https://api.deepseek.com/chat/completions', {
@@ -114,11 +169,11 @@ async function callDeepSeek(prompt: string, systemPrompt?: string): Promise<stri
       Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'deepseek-chat',
+      model: cfg.model,
       messages,
       response_format: { type: 'json_object' },
-      temperature: 0.7,
-      max_tokens: 1500,
+      temperature: cfg.temperature,
+      max_tokens: cfg.maxTokens,
     }),
   })
 
@@ -201,15 +256,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Missing required fields' })
   }
 
-  const cost = TOKEN_COSTS[action as ActionType] ?? 50
-  const { ok, balance } = await deductTokens(payload.hash, payload.tier, cost)
+  const { ai: aiCfg, bazi: baziCfg } = await getConfig()
+  const cost = (baziCfg.tokenCosts[action as ActionType] ?? DEFAULT_TOKEN_COSTS[action as ActionType]) ?? 50
 
-  if (!ok) {
-    return res.status(429).json({
-      error: 'Insufficient tokens',
-      balance,
-      message: 'Monthly token limit reached. Resets on the 1st of next month.',
-    })
+  // Admin tier: skip token deduction entirely
+  let finalBalance: number
+  if (payload.tier === 'admin') {
+    finalBalance = DEFAULT_MONTHLY_TOKENS.admin
+  } else {
+    const { ok, balance } = await deductTokens(payload.hash, payload.tier, cost)
+    if (!ok) {
+      return res.status(429).json({
+        error: 'Insufficient tokens',
+        balance,
+        message: 'Monthly token limit reached. Resets on the 1st of next month.',
+      })
+    }
+    finalBalance = balance
   }
 
   try {
@@ -222,14 +285,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // RAG: inject relevant classical knowledge into system prompt
     const knowledge = await fetchRelevantKnowledge(chart as Record<string, unknown>)
-    const systemPrompt = knowledge
+    const baseSystem = knowledge
       ? `You are a BaZi (Four Pillars of Destiny) master with deep knowledge of classical Chinese metaphysics. Use the following classical rules when relevant to improve accuracy:\n\n${knowledge}`
       : undefined
 
-    const result = await callDeepSeek(prompt, systemPrompt)
+    const result = await callDeepSeek(prompt, baseSystem, aiCfg)
     const parsed = JSON.parse(result)
 
-    return res.status(200).json({ data: parsed, tokensRemaining: balance })
+    return res.status(200).json({ data: parsed, tokensRemaining: finalBalance })
   } catch (err) {
     console.error('DeepSeek error:', err)
     return res.status(500).json({ error: 'Interpretation failed, please try again' })

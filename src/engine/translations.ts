@@ -37,6 +37,7 @@ export const UI: Record<string, Record<Language, string>> = {
   chart:           { bg: 'Картата',     ru: 'Карта',     en: 'Chart'       },
   lucky:           { bg: 'Дни на удача',ru: 'Удача',     en: 'Lucky Dates' },
   settings:        { bg: 'Настройки',   ru: 'Настройки', en: 'Settings'    },
+  admin:           { bg: 'Админ',       ru: 'Админ',     en: 'Admin'       },
   // Auth
   passphraseTitle: { bg: '🔮 Въведи паролата', ru: '🔮 Введи пароль', en: '🔮 Enter Passphrase' },
   passphraseHint:  { bg: 'Паролата ти е получена при покупка', ru: 'Пароль получен при покупке', en: 'Your passphrase was provided upon purchase' },

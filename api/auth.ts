@@ -8,19 +8,22 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-type Tier = 'free' | 'pro' | 'max'
+type Tier = 'free' | 'pro' | 'max' | 'admin'
 
 const MONTHLY_TOKENS: Record<Tier, number> = {
   free: 500,
   pro: 2000,
   max: 10000,
+  admin: 999999,
 }
 
 function getPassphraseTier(passphrase: string): Tier | null {
-  const free = (process.env.FREE_PASSPHRASES ?? '').split(',').map(s => s.trim()).filter(Boolean)
-  const pro = (process.env.PRO_PASSPHRASES ?? '').split(',').map(s => s.trim()).filter(Boolean)
-  const max = (process.env.MAX_PASSPHRASES ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  const admin = (process.env.ADMIN_PASSPHRASES ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  const free  = (process.env.FREE_PASSPHRASES  ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  const pro   = (process.env.PRO_PASSPHRASES   ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  const max   = (process.env.MAX_PASSPHRASES   ?? '').split(',').map(s => s.trim()).filter(Boolean)
 
+  if (admin.includes(passphrase)) return 'admin'
   if (max.includes(passphrase)) return 'max'
   if (pro.includes(passphrase)) return 'pro'
   if (free.includes(passphrase)) return 'free'

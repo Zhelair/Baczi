@@ -5,9 +5,10 @@ import Today from './screens/Today'
 import MyChart from './screens/MyChart'
 import LuckyDates from './screens/LuckyDates'
 import Settings from './screens/Settings'
+import AdminPanel from './screens/AdminPanel'
 import TabBar, { type Tab } from './components/TabBar'
 import { loadAuth, loadProfile, saveProfile, clearAll } from './utils/storage'
-import type { Language, Theme, UserProfile } from './engine/types'
+import type { Language, Theme, Tier, UserProfile } from './engine/types'
 
 type AppState = 'passphrase' | 'setup' | 'app'
 
@@ -25,6 +26,7 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(() => loadProfile())
   const [lang, setLang] = useState<Language>(() => loadProfile()?.language ?? 'bg')
   const [tab, setTab] = useState<Tab>('today')
+  const tier = loadAuth()?.tier as Tier | undefined
 
   // Apply theme on mount and whenever profile.theme changes
   useEffect(() => {
@@ -105,7 +107,8 @@ export default function App() {
           onReset={handleReset}
         />
       )}
-      <TabBar active={tab} onSelect={setTab} lang={lang} />
+      {tab === 'admin' && tier === 'admin' && <AdminPanel />}
+      <TabBar active={tab} onSelect={setTab} lang={lang} tier={tier} />
     </div>
   )
 }
