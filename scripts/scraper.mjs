@@ -1,10 +1,19 @@
 /**
- * BaZi Knowledge Scraper
- * Scrapes fourpillars.ru and mingli.info, extracts structured BaZi rules
- * via DeepSeek, and stores them in Supabase bazi_knowledge table.
+ * BaZi Knowledge Scraper  —  run locally whenever you want
  *
- * Run via GitHub Actions (weekly cron) or manually:
- *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... DEEPSEEK_API_KEY=... node scripts/scraper.mjs
+ * First time setup:
+ *   1. Run supabase/bazi_knowledge.sql in your Supabase SQL editor
+ *   2. Copy .env.example to .env.local and fill in credentials
+ *
+ * Run:
+ *   npm run scrape
+ *
+ * Or with inline env vars:
+ *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... DEEPSEEK_API_KEY=... npm run scrape
+ *
+ * The scraper discovers article links from index pages, extracts structured
+ * BaZi rules via DeepSeek, and upserts them into the bazi_knowledge table.
+ * Each run is safe to re-run — duplicates are ignored via ON CONFLICT.
  */
 
 import { createClient } from '@supabase/supabase-js'
