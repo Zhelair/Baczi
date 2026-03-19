@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+:root {
+  --color-wood:  #4ade80;
+  --color-fire:  #f87171;
+  --color-earth: #fbbf24;
+  --color-metal: #94a3b8;
+  --color-water: #60a5fa;
+}
+
+body {
+  background-color: #0a0a0a;
+  color: #f4f4f5;
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.element-wood  { color: var(--color-wood);  }
+.element-fire  { color: var(--color-fire);  }
+.element-earth { color: var(--color-earth); }
+.element-metal { color: var(--color-metal); }
+.element-water { color: var(--color-water); }
+
+.bg-element-wood  { background-color: rgb(74 222 128 / 0.12); border-color: rgb(74 222 128 / 0.3); }
+.bg-element-fire  { background-color: rgb(248 113 113 / 0.12); border-color: rgb(248 113 113 / 0.3); }
+.bg-element-earth { background-color: rgb(251 191 36 / 0.12); border-color: rgb(251 191 36 / 0.3); }
+.bg-element-metal { background-color: rgb(148 163 184 / 0.12); border-color: rgb(148 163 184 / 0.3); }
+.bg-element-water { background-color: rgb(96 165 250 / 0.12); border-color: rgb(96 165 250 / 0.3); }
+
+.chinese {
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", serif;
+}

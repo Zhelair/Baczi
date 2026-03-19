@@ -2,7 +2,7 @@
 
 ## Overview
 
-A **local-first Progressive Web App (PWA)** that calculates personalized BaZi (Four Pillars of Destiny) charts and delivers daily readings in **Bulgarian, Russian, and English**.
+A **local-first web app** that calculates personalized BaZi (Four Pillars of Destiny) charts and delivers daily readings in **Bulgarian, Russian, and English**. Hosted on Vercel, accessible via any browser — no installation required.
 
 No scraping. No database. No stored personal data. Fully legal. Fully private.
 
@@ -23,11 +23,11 @@ No scraping. No database. No stored personal data. Fully legal. Fully private.
 | Layer | Technology | Why |
 |-------|-----------|-----|
 | Frontend | React 18 + Vite + Tailwind CSS | Fast, familiar, mobile-first |
-| PWA | Vite PWA plugin | Installable on any device |
 | BaZi Engine | `lunar-javascript` (JS library) | Complete Chinese calendar, well-tested |
 | AI | DeepSeek V3 API | ~10x cheaper than Claude, excellent quality |
 | API Proxy | Vercel Serverless Functions (free tier) | Hides DeepSeek API key from frontend |
-| Storage | `localStorage` / `IndexedDB` | 100% client-side, no server storage |
+| Storage | `localStorage` | 100% client-side, no personal data on server |
+| Rate limiting | Vercel KV (free tier) | Daily counters only, resets UTC midnight |
 | Icons | Lucide React | Consistent with other projects |
 
 ---
@@ -35,7 +35,7 @@ No scraping. No database. No stored personal data. Fully legal. Fully private.
 ## Architecture
 
 ```
-User's Device (Browser / PWA)
+User's Device (Browser)
 ├── Birth data           → localStorage only, never sent anywhere
 ├── Calculated chart     → computed locally by BaZi engine
 ├── Cached daily reading → localStorage, refreshes each day
@@ -108,7 +108,7 @@ Language toggle visible on every screen. Preference saved in localStorage.
 Вашето ime:          [Ivan              ]
 Дата на раждане:     [31.10.1992        ]  ← DD.MM.YYYY
 Час на раждане:      [16:30             ]  ← HH:MM (optional)
-Пол:                 ◉ Мъж  ○ Жена  ○ Не желая да посоча
+Пол:                 ◉ Мъж  ○ Жена
 Език:                ◉ BG  ○ RU  ○ EN
 
               [ 🔮 Изчисли картата → ]
@@ -292,8 +292,9 @@ baczi/
 │       └── dateHelpers.ts
 │
 └── api/
-    └── interpret.ts               ← Vercel serverless function
-                                      (DeepSeek proxy, stateless)
+    ├── auth.ts                    ← verify passphrase → return JWT with tier
+    └── interpret.ts               ← validate JWT + rate limit (Vercel KV)
+                                      → call DeepSeek → return reading
 ```
 
 ---
@@ -310,7 +311,7 @@ baczi/
 - [ ] 3-language support (BG/RU/EN)
 - [ ] localStorage persistence
 - [ ] Mobile-first responsive design
-- [ ] PWA manifest (installable)
+- [ ] Passphrase auth gate (JWT, validated server-side on all API calls)
 
 ### Phase 2 — Enhanced
 - [ ] 10-year luck cycle timeline visualization
@@ -328,14 +329,77 @@ baczi/
 
 ---
 
+## Authentication — Passphrase + Tier System
+
+Mom shares passphrases with customers. Each tier has its own passphrase.
+Multiple people can share a passphrase, but the daily limit is shared too.
+
+### Tiers & Token Economy
+
+Each action costs tokens. Balances reset on the 1st of each month.
+
+| Tier | Monthly Tokens | Features |
+|------|---------------|----------|
+| FREE | 500 | Basic chart + today's reading |
+| PRO  | 2,000 | + Lucky dates calendar |
+| MAX  | 10,000 | + Monthly forecast (Phase 2) |
+
+| Action | Token Cost |
+|--------|-----------|
+| Full daily reading (AI) | 50 |
+| Quick luck check | 20 |
+| Lucky dates calendar | 30 |
+| View my chart | 0 (free) |
+
+Mom adds passphrases manually in Vercel env vars. Multiple people can
+share one passphrase — they share the token balance. More people = faster burn.
+
+```
+FREE_PASSPHRASES=word1,word2,word3
+PRO_PASSPHRASES=proword1,proword2
+MAX_PASSPHRASES=vipword1
+```
+
+### Auth Flow
+```
+1. User opens app → sees passphrase prompt
+2. Enters passphrase → POST /api/auth
+3. Vercel checks passphrase against FREE/PRO/MAX env vars
+4. ✅ Match → returns JWT containing { tier, exp: 30 days }
+5. JWT stored in localStorage
+6. Every API call: Authorization: Bearer <token>
+7. Server validates JWT + checks rate limit in Vercel KV
+8. ❌ Limit exceeded → 429 "Daily limit reached, resets at midnight UTC"
+```
+
+### Token Balances (Vercel KV — free tier)
+```
+Stores ONLY token balances keyed by passphrase hash (no personal data):
+  tokens:{sha256(passphrase)} → { balance: 450, tier: "free", resetDate: "2026-04-01" }
+
+Resets: 1st of each month (monthly allowance refill)
+Storage: ~200 bytes/passphrase — well within Vercel KV free tier
+```
+
+**No API keys are ever in the frontend bundle. Ever.**
+
+---
+
 ## Environment Variables
 
 ```env
-# Vercel serverless function only (never in frontend)
+# Vercel env vars only — never committed to git, never in frontend
 DEEPSEEK_API_KEY=sk-...
+JWT_SECRET=random-long-secret-for-signing-tokens
 
-# Frontend (public, safe to expose)
-VITE_API_BASE_URL=https://your-app.vercel.app
+# One passphrase per tier — mom shares these with customers
+FREE_PASSPHRASE=free-trial-word
+PRO_PASSPHRASE=pro-access-word
+MAX_PASSPHRASE=vip-access-word
+
+# Vercel KV connection (auto-populated by Vercel when KV is linked)
+KV_REST_API_URL=...
+KV_REST_API_TOKEN=...
 ```
 
 ---
@@ -346,7 +410,7 @@ VITE_API_BASE_URL=https://your-app.vercel.app
 2. Connect repo to Vercel (free tier)
 3. Set `DEEPSEEK_API_KEY` in Vercel env vars
 4. Deploy → get HTTPS URL
-5. Share link in Telegram — opens as PWA on mobile
+5. Share link in Telegram — opens as regular web page in any browser
 
 **Cost: €0/month** (Vercel free tier handles 50 users easily)
 
