@@ -6,11 +6,12 @@ import MyChart from './screens/MyChart'
 import LuckyDates from './screens/LuckyDates'
 import Settings from './screens/Settings'
 import AdminPanel from './screens/AdminPanel'
+import AdminDashboard from './screens/AdminDashboard'
 import TabBar, { type Tab } from './components/TabBar'
 import { loadAuth, loadProfile, saveProfile, clearAll } from './utils/storage'
 import type { Language, Theme, Tier, UserProfile } from './engine/types'
 
-type AppState = 'passphrase' | 'setup' | 'app'
+type AppState = 'passphrase' | 'setup' | 'admin' | 'app'
 
 function applyTheme(theme: Theme | undefined) {
   const t = theme ?? 'dark'
@@ -38,6 +39,11 @@ export default function App() {
   }, [state])
 
   function handleAuthSuccess() {
+    const auth = loadAuth()
+    if (auth?.tier === 'admin') {
+      setState('admin')
+      return
+    }
     if (loadProfile()) {
       setState('app')
     } else {
@@ -83,6 +89,19 @@ export default function App() {
 
   if (state === 'passphrase') {
     return <Passphrase lang={lang} onSuccess={handleAuthSuccess} />
+  }
+
+  // Admin lands on their own dashboard, can optionally jump into the full app
+  if (state === 'admin') {
+    return (
+      <AdminDashboard
+        lang={lang}
+        onGoToApp={() => {
+          if (loadProfile()) setState('app')
+          else setState('setup')
+        }}
+      />
+    )
   }
 
   if (state === 'setup') {
