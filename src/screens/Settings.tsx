@@ -1,14 +1,14 @@
 import { LogOut, Trash2 } from 'lucide-react'
 import { t } from '../engine/translations'
-import { clearAll } from '../utils/storage'
-import { loadAuth } from '../utils/storage'
+import { clearAll, loadAuth } from '../utils/storage'
 import TokenBadge from '../components/TokenBadge'
-import type { Language, UserProfile } from '../engine/types'
+import type { Language, Theme, UserProfile } from '../engine/types'
 
 interface Props {
   profile: UserProfile
   lang: Language
   onLangChange: (lang: Language) => void
+  onThemeChange: (theme: Theme) => void
   onReset: () => void
 }
 
@@ -18,8 +18,15 @@ const LANGS: { value: Language; label: string }[] = [
   { value: 'en', label: '🇬🇧 English' },
 ]
 
-export default function Settings({ profile, lang, onLangChange, onReset }: Props) {
+const THEMES: { value: Theme; emoji: string; label: Record<Language, string> }[] = [
+  { value: 'dark',     emoji: '🌑', label: { bg: 'Тъмна', ru: 'Тёмная', en: 'Dark' } },
+  { value: 'daylight', emoji: '☀️', label: { bg: 'Дневна', ru: 'Дневная', en: 'Daylight' } },
+  { value: 'neon',     emoji: '⚡', label: { bg: 'Неон', ru: 'Неон', en: 'Neon' } },
+]
+
+export default function Settings({ profile, lang, onLangChange, onThemeChange, onReset }: Props) {
   const auth = loadAuth()
+  const currentTheme: Theme = profile.theme ?? 'dark'
 
   function handleClearData() {
     if (window.confirm(t('clearConfirm', lang))) {
@@ -35,7 +42,9 @@ export default function Settings({ profile, lang, onLangChange, onReset }: Props
       {/* Profile info */}
       <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
         <div className="flex justify-between items-center">
-          <span className="text-zinc-400 text-sm">Name</span>
+          <span className="text-zinc-400 text-sm">
+            {lang === 'bg' ? 'Имe' : lang === 'ru' ? 'Имя' : 'Name'}
+          </span>
           <span className="text-zinc-100 font-medium">{profile.name}</span>
         </div>
         <div className="flex justify-between items-center">
@@ -49,6 +58,21 @@ export default function Settings({ profile, lang, onLangChange, onReset }: Props
               : ''}
           </span>
         </div>
+        {profile.birthCity && (
+          <div className="flex justify-between items-center">
+            <span className="text-zinc-400 text-sm">
+              {lang === 'bg' ? 'Град' : lang === 'ru' ? 'Город' : 'City'}
+            </span>
+            <span className="text-zinc-100 text-sm">
+              {profile.birthCity}
+              {profile.birthUtcOffset !== undefined && (
+                <span className="text-zinc-500 ml-1 text-xs">
+                  UTC{profile.birthUtcOffset >= 0 ? '+' : ''}{profile.birthUtcOffset}
+                </span>
+              )}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between items-center">
           <span className="text-zinc-400 text-sm">{t('gender', lang)}</span>
           <span className="text-zinc-100">{t(profile.gender, lang)}</span>
@@ -66,6 +90,29 @@ export default function Settings({ profile, lang, onLangChange, onReset }: Props
           </div>
         </section>
       )}
+
+      {/* Theme */}
+      <section className="mb-6">
+        <p className="text-xs uppercase tracking-wider text-zinc-500 mb-3">
+          {lang === 'bg' ? 'Тема' : lang === 'ru' ? 'Тема' : 'Theme'}
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {THEMES.map(({ value, emoji, label }) => (
+            <button
+              key={value}
+              onClick={() => onThemeChange(value)}
+              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border transition-colors ${
+                currentTheme === value
+                  ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                  : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'
+              }`}
+            >
+              <span className="text-xl">{emoji}</span>
+              <span className="text-xs font-medium">{label[lang]}</span>
+            </button>
+          ))}
+        </div>
+      </section>
 
       {/* Language */}
       <section className="mb-6">

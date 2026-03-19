@@ -7,9 +7,14 @@ import LuckyDates from './screens/LuckyDates'
 import Settings from './screens/Settings'
 import TabBar, { type Tab } from './components/TabBar'
 import { loadAuth, loadProfile, saveProfile, clearAll } from './utils/storage'
-import type { Language, UserProfile } from './engine/types'
+import type { Language, Theme, UserProfile } from './engine/types'
 
 type AppState = 'passphrase' | 'setup' | 'app'
+
+function applyTheme(theme: Theme | undefined) {
+  const t = theme ?? 'dark'
+  document.documentElement.setAttribute('data-theme', t)
+}
 
 export default function App() {
   const [state, setState] = useState<AppState>(() => {
@@ -21,7 +26,11 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() => loadProfile()?.language ?? 'bg')
   const [tab, setTab] = useState<Tab>('today')
 
-  // Re-check state when auth or profile changes
+  // Apply theme on mount and whenever profile.theme changes
+  useEffect(() => {
+    applyTheme(profile?.theme)
+  }, [profile?.theme])
+
   useEffect(() => {
     if (state === 'app' && !loadAuth()) setState('passphrase')
   }, [state])
@@ -37,7 +46,10 @@ export default function App() {
   function handleSetupDone() {
     const p = loadProfile()
     setProfile(p)
-    if (p) setLang(p.language)
+    if (p) {
+      setLang(p.language)
+      applyTheme(p.theme)
+    }
     setState('app')
   }
 
@@ -50,10 +62,20 @@ export default function App() {
     }
   }
 
+  function handleThemeChange(newTheme: Theme) {
+    applyTheme(newTheme)
+    if (profile) {
+      const updated = { ...profile, theme: newTheme }
+      saveProfile(updated)
+      setProfile(updated)
+    }
+  }
+
   function handleReset() {
     clearAll()
     setProfile(null)
     setLang('bg')
+    applyTheme('dark')
     setState('passphrase')
   }
 
@@ -79,6 +101,7 @@ export default function App() {
           profile={profile}
           lang={lang}
           onLangChange={handleLangChange}
+          onThemeChange={handleThemeChange}
           onReset={handleReset}
         />
       )}

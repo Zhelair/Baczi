@@ -4,6 +4,8 @@ import { t } from '../engine/translations'
 import { getInterpretation } from '../utils/api'
 import { loadAuth, saveAuth } from '../utils/storage'
 import TokenBadge from '../components/TokenBadge'
+import ThinkingOrb from '../components/ThinkingOrb'
+import AiStatusBadge from '../components/AiStatusBadge'
 import type { Language, UserProfile } from '../engine/types'
 
 interface Props {
@@ -27,8 +29,11 @@ export default function LuckyDates({ profile, lang }: Props) {
     setError('')
     setLoading(true)
     try {
-      const chart = calculateChart(profile.birthYear, profile.birthMonth, profile.birthDay,
-        profile.birthHour, profile.birthMinute, profile.gender, lang)
+      const chart = calculateChart(
+        profile.birthYear, profile.birthMonth, profile.birthDay,
+        profile.birthHour, profile.birthMinute, profile.gender, lang,
+        profile.birthLongitude, profile.birthUtcOffset
+      )
       const today = calculateTodayPillars(lang)
       const { data, tokensRemaining } = await getInterpretation(
         'luck_check',
@@ -52,7 +57,10 @@ export default function LuckyDates({ profile, lang }: Props) {
     <div className="pb-24 px-4 pt-6 max-w-lg mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-zinc-100">{t('lucky', lang)}</h2>
-        {auth && <TokenBadge balance={auth.balance} tier={auth.tier} resetDate={auth.resetDate} lang={lang} />}
+        <div className="flex items-center gap-2">
+          <AiStatusBadge loading={loading} lang={lang} />
+          {auth && <TokenBadge balance={auth.balance} tier={auth.tier} resetDate={auth.resetDate} lang={lang} />}
+        </div>
       </div>
 
       {/* Quick luck check */}
@@ -61,8 +69,10 @@ export default function LuckyDates({ profile, lang }: Props) {
         disabled={loading}
         className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-semibold rounded-xl py-3 mb-6 transition-colors"
       >
-        {loading ? t('loading', lang) : t('quickLuck', lang)}
+        {t('quickLuck', lang)}
       </button>
+
+      {loading && <ThinkingOrb lang={lang} />}
 
       {error && (
         <div className="rounded-xl border border-red-900 bg-red-950/30 p-4 mb-4">
