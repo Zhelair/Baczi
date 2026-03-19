@@ -1,7 +1,9 @@
-import { LogOut, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { LogOut, Trash2, ShieldAlert } from 'lucide-react'
 import { t } from '../engine/translations'
-import { clearAll, loadAuth } from '../utils/storage'
+import { clearAll, loadAuth, saveAdminToken, loadAdminToken, clearAdminToken } from '../utils/storage'
 import TokenBadge from '../components/TokenBadge'
+import AdminPanel from './AdminPanel'
 import type { Language, Theme, UserProfile } from '../engine/types'
 
 interface Props {
@@ -27,11 +29,46 @@ const THEMES: { value: Theme; emoji: string; label: Record<Language, string> }[]
 export default function Settings({ profile, lang, onLangChange, onThemeChange, onReset }: Props) {
   const auth = loadAuth()
   const currentTheme: Theme = profile.theme ?? 'dark'
+  const [adminToken, setAdminToken] = useState<string | null>(() => loadAdminToken())
+  const [adminPhrase, setAdminPhrase] = useState('')
+  const [adminError, setAdminError] = useState('')
+  const [adminLoading, setAdminLoading] = useState(false)
 
   function handleClearData() {
     if (window.confirm(t('clearConfirm', lang))) {
       clearAll()
       onReset()
+    }
+  }
+
+  async function handleAdminUnlock() {
+    if (!adminPhrase.trim()) return
+    setAdminLoading(true)
+    setAdminError('')
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passphrase: adminPhrase.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.tier !== 'admin') {
+        setAdminError(
+          lang === 'bg' ? 'Невалидна парола' :
+          lang === 'ru' ? 'Неверный пароль' : 'Invalid admin passphrase'
+        )
+        return
+      }
+      saveAdminToken(data.token)
+      setAdminToken(data.token)
+      setAdminPhrase('')
+    } catch {
+      setAdminError(
+        lang === 'bg' ? 'Нещо се обърка' :
+        lang === 'ru' ? 'Что-то пошло не так' : 'Something went wrong'
+      )
+    } finally {
+      setAdminLoading(false)
     }
   }
 
@@ -133,6 +170,56 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
           ))}
         </div>
       </section>
+
+      {/* Admin access */}
+      {adminToken ? (
+        <section className="mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <ShieldAlert size={14} className="text-red-400" />
+            <p className="text-xs uppercase tracking-wider text-red-400">Admin Panel</p>
+            <button
+              onClick={() => { clearAdminToken(); setAdminToken(null) }}
+              className="ml-auto text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+            >
+              {lang === 'bg' ? 'Затвори' : lang === 'ru' ? 'Закрыть' : 'Close'}
+            </button>
+          </div>
+          <AdminPanel adminToken={adminToken} />
+        </section>
+      ) : (
+        <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldAlert size={14} className="text-zinc-600" />
+            <p className="text-xs uppercase tracking-wider text-zinc-500">
+              {lang === 'bg' ? 'Администраторски достъп' :
+               lang === 'ru' ? 'Доступ администратора' : 'Admin Access'}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              placeholder={
+                lang === 'bg' ? 'Администраторска парола' :
+                lang === 'ru' ? 'Пароль администратора' : 'Admin passphrase'
+              }
+              value={adminPhrase}
+              onChange={e => setAdminPhrase(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAdminUnlock()}
+              className="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition-colors"
+            />
+            <button
+              onClick={handleAdminUnlock}
+              disabled={adminLoading || !adminPhrase.trim()}
+              className="px-4 py-2 rounded-lg bg-red-900/40 text-red-400 border border-red-900 text-sm hover:bg-red-900/60 transition-colors disabled:opacity-40"
+            >
+              {adminLoading ? '…' : lang === 'bg' ? 'Влез' : lang === 'ru' ? 'Войти' : 'Unlock'}
+            </button>
+          </div>
+          {adminError && (
+            <p className="mt-2 text-xs text-red-400">{adminError}</p>
+          )}
+        </section>
+      )}
 
       {/* Danger zone */}
       <section className="space-y-3">

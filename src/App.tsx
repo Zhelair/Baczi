@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Passphrase from './screens/Passphrase'
 import Setup from './screens/Setup'
 import Today from './screens/Today'
 import MyChart from './screens/MyChart'
 import LuckyDates from './screens/LuckyDates'
 import Settings from './screens/Settings'
+import AskBazi from './screens/AskBazi'
 import AdminPanel from './screens/AdminPanel'
 import AdminDashboard from './screens/AdminDashboard'
 import TabBar, { type Tab } from './components/TabBar'
 import { loadAuth, loadProfile, saveProfile, clearAll } from './utils/storage'
+import { calculateChart } from './engine/baziCalculator'
 import type { Language, Theme, Tier, UserProfile } from './engine/types'
 
 type AppState = 'passphrase' | 'setup' | 'admin' | 'app'
@@ -28,6 +30,18 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() => loadProfile()?.language ?? 'bg')
   const [tab, setTab] = useState<Tab>('today')
   const tier = loadAuth()?.tier as Tier | undefined
+
+  const chart = useMemo(() => {
+    if (!profile) return null
+    try {
+      return calculateChart(
+        profile.birthYear, profile.birthMonth, profile.birthDay,
+        profile.birthHour ?? null, profile.birthMinute ?? null,
+        profile.gender, lang,
+        profile.birthLongitude, profile.birthUtcOffset
+      )
+    } catch { return null }
+  }, [profile, lang])
 
   // Apply theme on mount and whenever profile.theme changes
   useEffect(() => {
@@ -117,6 +131,7 @@ export default function App() {
       {tab === 'today'    && <Today profile={profile} lang={lang} />}
       {tab === 'chart'    && <MyChart profile={profile} lang={lang} />}
       {tab === 'lucky'    && <LuckyDates profile={profile} lang={lang} />}
+      {tab === 'ask'      && chart && <AskBazi chart={chart} lang={lang} />}
       {tab === 'settings' && (
         <Settings
           profile={profile}
