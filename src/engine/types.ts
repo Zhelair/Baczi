@@ -1,6 +1,7 @@
 export type Language = 'bg' | 'ru' | 'en'
 export type Tier = 'free' | 'pro' | 'max'
 export type Gender = 'male' | 'female'
+export type Theme = 'dark' | 'daylight' | 'neon'
 
 export interface UserProfile {
   name: string
@@ -11,6 +12,12 @@ export interface UserProfile {
   birthMinute: number | null
   gender: Gender
   language: Language
+  theme?: Theme
+  // Birth location for true solar time correction
+  birthCity?: string
+  birthLongitude?: number
+  birthLatitude?: number
+  birthUtcOffset?: number   // e.g. 6 for UTC+6
 }
 
 export interface Pillar {

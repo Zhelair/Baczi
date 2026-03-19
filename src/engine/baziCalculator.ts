@@ -25,11 +25,25 @@ export function calculateChart(
   hour: number | null,
   minute: number | null,
   gender: 'male' | 'female',
-  lang: Language
+  lang: Language,
+  longitude?: number,
+  utcOffsetHours?: number
 ): BaziChart {
+  // True Solar Time correction: (longitude − standard_meridian) × 4 min per degree
+  let adjustedHour = hour
+  let adjustedMinute = minute ?? 0
+  if (hour !== null && longitude !== undefined && utcOffsetHours !== undefined) {
+    const standardMeridian = utcOffsetHours * 15
+    const correctionMinutes = Math.round((longitude - standardMeridian) * 4)
+    let total = hour * 60 + adjustedMinute + correctionMinutes
+    total = ((total % 1440) + 1440) % 1440   // keep within 0..1439
+    adjustedHour = Math.floor(total / 60)
+    adjustedMinute = total % 60
+  }
+
   const solar =
-    hour !== null && minute !== null
-      ? Solar.fromYmdHms(year, month, day, hour, minute, 0)
+    adjustedHour !== null
+      ? Solar.fromYmdHms(year, month, day, adjustedHour, adjustedMinute, 0)
       : Solar.fromYmd(year, month, day)
 
   const lunar = solar.getLunar()
@@ -40,8 +54,8 @@ export function calculateChart(
   const dayPillar   = makePillar(ec.getDayGan(),   ec.getDayZhi(),   lang)
 
   let hourPillar: Pillar | null = null
-  if (hour !== null) {
-    hourPillar = makePillar(ec.getHourGan(), ec.getHourZhi(), lang)
+  if (adjustedHour !== null) {
+    hourPillar = makePillar(ec.getTimeGan(), ec.getTimeZhi(), lang)
   }
 
   const dayGan = ec.getDayGan()

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* ─── Element palette ──────────────────────────────────────────────────────── */
 :root {
   --color-wood:  #4ade80;
   --color-fire:  #f87171;
@@ -8,6 +9,7 @@
   --color-water: #60a5fa;
 }
 
+/* ─── Base body ─────────────────────────────────────────────────────────────── */
 body {
   background-color: #0a0a0a;
   color: #f4f4f5;
@@ -15,6 +17,60 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ─── DAYLIGHT THEME ────────────────────────────────────────────────────────── */
+[data-theme="daylight"] {
+  /* Override Tailwind zinc palette → warm parchment */
+  --color-zinc-950: #f5f0e8;
+  --color-zinc-900: #ede8df;
+  --color-zinc-800: #d8cfc2;
+  --color-zinc-700: #c2b9ad;
+  --color-zinc-600: #a09387;
+  --color-zinc-500: #8a7d72;
+  --color-zinc-400: #6b5e53;
+  --color-zinc-300: #503f35;
+  --color-zinc-200: #3a2d24;
+  --color-zinc-100: #1c1714;
+  /* Keep amber accents but slightly darker */
+  --color-amber-500: #c47900;
+  --color-amber-400: #a36500;
+}
+
+[data-theme="daylight"] body {
+  background-color: #f5f0e8;
+  color: #1c1714;
+}
+
+/* ─── NEON THEME ────────────────────────────────────────────────────────────── */
+[data-theme="neon"] {
+  /* Override Tailwind zinc → deep space purple */
+  --color-zinc-950: #03030f;
+  --color-zinc-900: #0d0b20;
+  --color-zinc-800: #1a1640;
+  --color-zinc-700: #2d2569;
+  --color-zinc-600: #4a3b99;
+  --color-zinc-500: #7c6ab8;
+  --color-zinc-400: #a78bfa;
+  --color-zinc-300: #c4b5fd;
+  --color-zinc-200: #ddd6fe;
+  --color-zinc-100: #f0ecff;
+  /* Swap amber → neon fuchsia */
+  --color-amber-500: #c026d3;
+  --color-amber-400: #e879f9;
+  --color-amber-300: #f5d0fe;
+  --color-amber-950: #2e0939;
+  --color-red-900:  #4a044e;
+  --color-red-950:  #2e0939;
+  --color-red-400:  #f0abfc;
+  --color-green-400: #34d399;
+  --color-green-500: #10b981;
+}
+
+[data-theme="neon"] body {
+  background-color: #03030f;
+  color: #f0ecff;
+}
+
+/* ─── Element color classes ─────────────────────────────────────────────────── */
 .element-wood  { color: var(--color-wood);  }
 .element-fire  { color: var(--color-fire);  }
 .element-earth { color: var(--color-earth); }
@@ -29,4 +85,81 @@ body {
 
 .chinese {
   font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", serif;
+}
+
+/* ─── ThinkingOrb component ─────────────────────────────────────────────────── */
+.thinking-ring-outer {
+  background-color: color-mix(in srgb, var(--color-amber-500) 8%, transparent);
+  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.thinking-ring-inner {
+  background-color: color-mix(in srgb, var(--color-amber-500) 14%, transparent);
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.thinking-core {
+  background-color: color-mix(in srgb, var(--color-amber-500) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-amber-500) 40%, transparent);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--color-amber-500) 30%, transparent);
+}
+.thinking-pill {
+  background-color: color-mix(in srgb, var(--color-amber-500) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-amber-500) 35%, transparent);
+}
+.thinking-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-amber-500);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.thinking-text { color: var(--color-amber-400); }
+.thinking-bounce-dot {
+  display: inline-block;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background-color: var(--color-amber-500);
+  animation: bounce 1s infinite;
+}
+
+/* ─── AiStatusBadge ─────────────────────────────────────────────────────────── */
+.ai-thinking-badge {
+  border-color: color-mix(in srgb, var(--color-amber-500) 40%, transparent);
+  background-color: color-mix(in srgb, var(--color-amber-500) 10%, transparent);
+  color: var(--color-amber-400);
+}
+.ai-thinking-dot { background-color: var(--color-amber-400); }
+
+.ai-connected-badge {
+  border-color: color-mix(in srgb, var(--color-green-500, #10b981) 35%, transparent);
+  background-color: color-mix(in srgb, var(--color-green-500, #10b981) 8%, transparent);
+  color: var(--color-green-400, #34d399);
+}
+.ai-connected-dot { background-color: var(--color-green-400, #34d399); }
+
+/* ─── City autocomplete dropdown ───────────────────────────────────────────── */
+.city-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0; right: 0;
+  z-index: 50;
+  margin-top: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--color-zinc-700, #3f3f46);
+  background-color: var(--color-zinc-900, #18181b);
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.city-dropdown-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-zinc-100, #f4f4f5);
+  transition: background-color 0.15s;
+}
+.city-dropdown-item:hover {
+  background-color: color-mix(in srgb, var(--color-amber-500) 12%, transparent);
+}
+.city-dropdown-item-sub {
+  font-size: 12px;
+  color: var(--color-zinc-500, #71717a);
+  margin-top: 2px;
 }

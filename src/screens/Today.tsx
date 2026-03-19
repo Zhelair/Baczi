@@ -3,6 +3,8 @@ import { Zap, Clock } from 'lucide-react'
 import PillarCard from '../components/PillarCard'
 import StarRating from '../components/StarRating'
 import TokenBadge from '../components/TokenBadge'
+import ThinkingOrb from '../components/ThinkingOrb'
+import AiStatusBadge from '../components/AiStatusBadge'
 import { calculateChart, calculateTodayPillars, serializeChart, serializeToday } from '../engine/baziCalculator'
 import { t, LIFE_AREA_EMOJIS } from '../engine/translations'
 import { loadAuth, saveAuth } from '../utils/storage'
@@ -17,8 +19,11 @@ interface Props {
 
 export default function Today({ profile, lang }: Props) {
   const [chart] = useState<BaziChart>(() =>
-    calculateChart(profile.birthYear, profile.birthMonth, profile.birthDay,
-      profile.birthHour, profile.birthMinute, profile.gender, lang)
+    calculateChart(
+      profile.birthYear, profile.birthMonth, profile.birthDay,
+      profile.birthHour, profile.birthMinute, profile.gender, lang,
+      profile.birthLongitude, profile.birthUtcOffset
+    )
   )
   const [todayPillars] = useState<TodayPillars>(() => calculateTodayPillars(lang))
   const [reading, setReading] = useState<DailyReading | null>(() => loadTodayReading())
@@ -71,9 +76,12 @@ export default function Today({ profile, lang }: Props) {
           <h2 className="text-lg font-semibold text-zinc-100">
             {profile.name} · {t('today', lang)}
           </h2>
-          {auth && (
-            <TokenBadge balance={auth.balance} tier={auth.tier} resetDate={auth.resetDate} lang={lang} />
-          )}
+          <div className="flex items-center gap-2">
+            <AiStatusBadge loading={loading} lang={lang} />
+            {auth && (
+              <TokenBadge balance={auth.balance} tier={auth.tier} resetDate={auth.resetDate} lang={lang} />
+            )}
+          </div>
         </div>
         <p className="text-zinc-500 text-sm capitalize">{dateStr}</p>
       </div>
@@ -98,12 +106,7 @@ export default function Today({ profile, lang }: Props) {
       </section>
 
       {/* Reading area */}
-      {loading && (
-        <div className="text-center py-12 text-zinc-500">
-          <div className="text-4xl mb-3 animate-pulse">🔮</div>
-          <p>{t('loading', lang)}</p>
-        </div>
-      )}
+      {loading && <ThinkingOrb lang={lang} />}
 
       {error && (
         <div className="rounded-xl border border-red-900 bg-red-950/30 p-4 mb-4">
