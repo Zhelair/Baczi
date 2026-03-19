@@ -41,7 +41,7 @@ export function calculateChart(
 
   let hourPillar: Pillar | null = null
   if (hour !== null) {
-    hourPillar = makePillar(ec.getHourGan(), ec.getHourZhi(), lang)
+    hourPillar = makePillar(ec.getTimeGan(), ec.getTimeZhi(), lang)
   }
 
   const dayGan = ec.getDayGan()
