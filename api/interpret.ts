@@ -7,6 +7,51 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// ── Chinese char → English pinyin mapping for RAG tag lookup ─────────────────
+const CHAR_TO_PINYIN: Record<string, string> = {
+  // Heavenly Stems
+  '甲': 'Jia', '乙': 'Yi', '丙': 'Bing', '丁': 'Ding', '戊': 'Wu',
+  '己': 'Ji', '庚': 'Geng', '辛': 'Xin', '壬': 'Ren', '癸': 'Gui',
+  // Earthly Branches
+  '子': 'Zi', '丑': 'Chou', '寅': 'Yin', '卯': 'Mao', '辰': 'Chen',
+  '巳': 'Si', '午': 'Wu', '未': 'Wei', '申': 'Shen', '酉': 'You',
+  '戌': 'Xu', '亥': 'Hai',
+}
+
+function extractPinyinTags(chart: Record<string, unknown>): string[] {
+  const tags = new Set<string>()
+  const pillars = ['year', 'month', 'day', 'hour']
+  for (const pillar of pillars) {
+    const p = chart[pillar] as Record<string, string> | null | undefined
+    if (!p) continue
+    if (p.gan && CHAR_TO_PINYIN[p.gan]) tags.add(CHAR_TO_PINYIN[p.gan])
+    if (p.zhi && CHAR_TO_PINYIN[p.zhi]) tags.add(CHAR_TO_PINYIN[p.zhi])
+  }
+  const dm = chart.dayMaster as Record<string, string> | undefined
+  if (dm?.gan && CHAR_TO_PINYIN[dm.gan]) tags.add(CHAR_TO_PINYIN[dm.gan])
+  return [...tags]
+}
+
+async function fetchRelevantKnowledge(chart: Record<string, unknown>): Promise<string> {
+  const tags = extractPinyinTags(chart)
+  if (tags.length === 0) return ''
+
+  const { data, error } = await supabase
+    .from('bazi_knowledge')
+    .select('pattern, rule_text, school, confidence')
+    .overlaps('tags', tags)
+    .in('confidence', ['high', 'medium'])
+    .order('confidence', { ascending: true }) // high first (alphabetically h < m)
+    .limit(6)
+
+  if (error || !data || data.length === 0) return ''
+
+  const lines = data.map(r =>
+    `• [${r.school}] ${r.pattern}: ${r.rule_text}`
+  )
+  return `Classical BaZi knowledge relevant to this chart:\n${lines.join('\n')}`
+}
+
 type Tier = 'free' | 'pro' | 'max'
 type ActionType = 'daily_reading' | 'luck_check' | 'lucky_dates'
 
@@ -57,7 +102,11 @@ async function deductTokens(hash: string, tier: Tier, cost: number): Promise<{ o
   return { ok: true, balance }
 }
 
-async function callDeepSeek(prompt: string): Promise<string> {
+async function callDeepSeek(prompt: string, systemPrompt?: string): Promise<string> {
+  const messages: Array<{ role: string; content: string }> = []
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt })
+  messages.push({ role: 'user', content: prompt })
+
   const response = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
     headers: {
@@ -66,7 +115,7 @@ async function callDeepSeek(prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       model: 'deepseek-chat',
-      messages: [{ role: 'user', content: prompt }],
+      messages,
       response_format: { type: 'json_object' },
       temperature: 0.7,
       max_tokens: 1500,
@@ -171,7 +220,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       prompt = buildDailyReadingPrompt(chart, today, language)
     }
 
-    const result = await callDeepSeek(prompt)
+    // RAG: inject relevant classical knowledge into system prompt
+    const knowledge = await fetchRelevantKnowledge(chart as Record<string, unknown>)
+    const systemPrompt = knowledge
+      ? `You are a BaZi (Four Pillars of Destiny) master with deep knowledge of classical Chinese metaphysics. Use the following classical rules when relevant to improve accuracy:\n\n${knowledge}`
+      : undefined
+
+    const result = await callDeepSeek(prompt, systemPrompt)
     const parsed = JSON.parse(result)
 
     return res.status(200).json({ data: parsed, tokensRemaining: balance })
