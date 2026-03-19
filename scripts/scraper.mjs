@@ -8,20 +8,112 @@
  * Run:
  *   npm run scrape
  *
- * Or with inline env vars:
- *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... DEEPSEEK_API_KEY=... npm run scrape
+ * Sources processed (in order):
+ *   1. knowledge/*.md     — your curated rules (direct, no DeepSeek cost)
+ *   2. knowledge/html/*.html — local HTML files you saved from your browser
+ *   3. Web: fourpillars.ru, mingli.info (DeepSeek extraction)
  *
- * The scraper discovers article links from index pages, extracts structured
- * BaZi rules via DeepSeek, and upserts them into the bazi_knowledge table.
  * Each run is safe to re-run — duplicates are ignored via ON CONFLICT.
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { readdir, readFile } from 'fs/promises'
+import { join, extname, basename } from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url))
+const ROOT = join(__dirname, '..')
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
+
+// ── .md structured parser (no DeepSeek — direct load) ────────────────────────
+
+/**
+ * Parses a structured .md file into rule objects.
+ *
+ * Format (see knowledge/README.md for full spec):
+ *
+ *   ## pattern_name
+ *   tags: Tag1, Tag2
+ *   school: classical
+ *   confidence: high
+ *
+ *   Rule description text.
+ *
+ *   ---
+ */
+function parseMdRules(content, filePath) {
+  const sourceUrl = `local:${basename(filePath)}`
+  const rules = []
+
+  // Split on ## headings (each heading starts a new rule block)
+  const blocks = content.split(/^## /m).slice(1)
+
+  for (const block of blocks) {
+    const lines = block.split('\n')
+    const pattern = lines[0].trim()
+    if (!pattern) continue
+
+    let tags = []
+    let school = 'unknown'
+    let confidence = 'medium'
+    let descLines = []
+    let inDesc = false
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i]
+
+      if (line.startsWith('---')) break  // end of rule block
+
+      if (!inDesc) {
+        if (line.startsWith('tags:')) {
+          tags = line.replace('tags:', '').split(',').map(t => t.trim()).filter(Boolean)
+          continue
+        }
+        if (line.startsWith('school:')) {
+          school = line.replace('school:', '').trim()
+          continue
+        }
+        if (line.startsWith('confidence:')) {
+          confidence = line.replace('confidence:', '').trim()
+          continue
+        }
+        // blank line after metadata = start of description
+        if (line.trim() === '') {
+          inDesc = true
+          continue
+        }
+      } else {
+        descLines.push(line)
+      }
+    }
+
+    const rule_text = descLines.join('\n').trim()
+    if (!pattern || !rule_text) continue
+
+    rules.push({
+      pattern: pattern.slice(0, 200),
+      rule_text: rule_text.slice(0, 1000),
+      school: school.slice(0, 50),
+      source_url: sourceUrl,
+      confidence: ['high', 'medium', 'low'].includes(confidence) ? confidence : 'medium',
+      tags,
+      lang: 'en',
+    })
+  }
+
+  return rules
+}
+
+async function processLocalMd(filePath) {
+  const content = await readFile(filePath, 'utf8')
+  const rules = parseMdRules(content, filePath)
+  console.log(`  Parsed ${rules.length} rules from ${basename(filePath)}`)
+  return rules
+}
 
 // ── HTML helpers ──────────────────────────────────────────────────────────────
 
@@ -43,7 +135,6 @@ function htmlToText(html) {
     .trim()
 }
 
-// Extract article links from an index/listing page
 function extractArticleLinks(html, baseUrl) {
   const links = new Set()
   const patterns = [
@@ -55,10 +146,7 @@ function extractArticleLinks(html, baseUrl) {
     while ((match = pattern.exec(html)) !== null) {
       const href = match[1]
       const full = href.startsWith('http') ? href : new URL(href, baseUrl).href
-      // Only include content pages, not the index pages themselves
-      if (!full.match(/\?|#/) && full !== baseUrl) {
-        links.add(full)
-      }
+      if (!full.match(/\?|#/) && full !== baseUrl) links.add(full)
     }
   }
   return [...links]
@@ -77,10 +165,7 @@ async function fetchPage(url, retries = 3) {
         },
         signal: AbortSignal.timeout(15000),
       })
-      if (!res.ok) {
-        console.log(`  HTTP ${res.status} for ${url}`)
-        return null
-      }
+      if (!res.ok) { console.log(`  HTTP ${res.status} for ${url}`); return null }
       return await res.text()
     } catch (err) {
       console.log(`  Fetch attempt ${i + 1} failed for ${url}: ${err.message}`)
@@ -94,10 +179,9 @@ function sleep(ms) {
   return new Promise(r => setTimeout(r, ms))
 }
 
-// ── DeepSeek rule extraction ──────────────────────────────────────────────────
+// ── DeepSeek extraction (used for web pages and local HTML) ───────────────────
 
 async function extractRules(text, sourceUrl, lang) {
-  // Trim to fit context — keep up to 5000 chars of meaningful content
   const trimmed = text.slice(0, 5000)
 
   const prompt = `You are a BaZi (Four Pillars of Destiny) expert. Extract structured BaZi rules from the article text below.
@@ -110,27 +194,25 @@ Article text:
 ${trimmed}
 """
 
-Extract every distinct BaZi rule, relationship, interaction, or principle mentioned (clashes, combinations, punishments, destructions, element interactions, day master strengths, luck cycle effects, etc.).
+Extract every distinct BaZi rule, relationship, interaction, or principle mentioned.
 
-Respond ONLY with valid JSON object in this exact format:
+Respond ONLY with valid JSON:
 {
   "rules": [
     {
-      "pattern": "short identifier like 'Geng+Yi_combine' or 'Zi_Wu_clash' or 'strong_Jia_daymaster'",
+      "pattern": "short identifier using pinyin e.g. Zi_Wu_clash or strong_Jia_daymaster",
       "rule_text": "clear description of the rule in English",
       "school": "classical",
       "confidence": "high",
-      "tags": ["Geng", "Yi", "combine", "heavenly_stem"]
+      "tags": ["Zi", "Wu", "clash", "earthly_branch"]
     }
   ]
 }
 
-Guidelines:
-- pattern: use English pinyin names (Jia Yi Bing Ding Wu Ji Geng Xin Ren Gui / Zi Chou Yin Mao Chen Si Wu Wei Shen You Xu Hai)
-- tags: include all stems/branches involved + topic words (clash, combine, punishment, destruction, element, daymaster, luck_cycle, year, month, day, hour)
+- pattern: pinyin names (Jia Yi Bing Ding Wu Ji Geng Xin Ren Gui / Zi Chou Yin Mao Chen Si Wu Wei Shen You Xu Hai)
 - confidence: "high" if clearly stated, "medium" if implied, "low" if uncertain
-- school: "classical" for traditional texts, "dong_gong", "joey_yap", "zi_ping", or "unknown"
-- If no BaZi rules found, return {"rules": []}`
+- school: "classical" | "dong_gong" | "joey_yap" | "zi_ping" | "unknown"
+- If no rules found: {"rules": []}`
 
   try {
     const res = await fetch('https://api.deepseek.com/chat/completions', {
@@ -149,14 +231,10 @@ Guidelines:
       signal: AbortSignal.timeout(30000),
     })
 
-    if (!res.ok) {
-      console.log(`  DeepSeek error ${res.status} for ${sourceUrl}`)
-      return []
-    }
+    if (!res.ok) { console.log(`  DeepSeek error ${res.status}`); return [] }
 
     const data = await res.json()
-    const content = data.choices[0].message.content
-    const parsed = JSON.parse(content)
+    const parsed = JSON.parse(data.choices[0].message.content)
     const rules = parsed.rules ?? []
 
     return rules.map(r => ({
@@ -169,7 +247,7 @@ Guidelines:
       lang,
     }))
   } catch (err) {
-    console.log(`  Extraction error for ${sourceUrl}: ${err.message}`)
+    console.log(`  Extraction error: ${err.message}`)
     return []
   }
 }
@@ -178,30 +256,39 @@ Guidelines:
 
 async function storeRules(rules) {
   if (rules.length === 0) return 0
-
-  const { error, count } = await supabase
+  const { error } = await supabase
     .from('bazi_knowledge')
     .upsert(rules, { onConflict: 'pattern,source_url', ignoreDuplicates: false })
-    .select('id', { count: 'exact', head: true })
-
-  if (error) {
-    console.log(`  Supabase error: ${error.message}`)
-    return 0
-  }
+  if (error) { console.log(`  Supabase error: ${error.message}`); return 0 }
   return rules.length
 }
 
-// ── Scraping targets ──────────────────────────────────────────────────────────
+// ── File scanning helpers ─────────────────────────────────────────────────────
+
+async function findFiles(dir, ext) {
+  const results = []
+  let entries
+  try { entries = await readdir(dir, { withFileTypes: true }) } catch { return results }
+  for (const entry of entries) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      results.push(...await findFiles(full, ext))
+    } else if (entry.isFile() && extname(entry.name).toLowerCase() === ext) {
+      results.push(full)
+    }
+  }
+  return results
+}
+
+// ── Web targets ───────────────────────────────────────────────────────────────
 
 const INDEX_PAGES = [
-  // fourpillars.ru index pages (will discover article links)
   { url: 'https://fourpillars.ru/articles', lang: 'ru', discover: true },
   ...Array.from({ length: 9 }, (_, i) => ({
     url: `https://fourpillars.ru/sections/${i + 1}`,
     lang: 'ru',
     discover: true,
   })),
-  // mingli.info index pages
   { url: 'https://mingli.info/articles', lang: 'ru', discover: true },
   { url: 'https://mingli.info/bazi-theory', lang: 'ru', discover: true },
   { url: 'https://mingli.info/theory', lang: 'ru', discover: true },
@@ -209,30 +296,52 @@ const INDEX_PAGES = [
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-async function processPage(url, lang) {
-  const html = await fetchPage(url)
-  if (!html) return 0
+async function main() {
+  console.log('=== BaZi Knowledge Scraper ===')
+  console.log(`Time: ${new Date().toISOString()}\n`)
 
-  const text = htmlToText(html)
-  if (text.length < 300) {
-    console.log(`  Too short (${text.length} chars), skipping`)
-    return 0
+  let totalRules = 0
+
+  // ── 1. Local .md files (direct parse, no DeepSeek) ──────────────────────────
+  const knowledgeDir = join(ROOT, 'knowledge')
+  const mdFiles = (await findFiles(knowledgeDir, '.md'))
+    .filter(f => basename(f) !== 'README.md')
+
+  if (mdFiles.length > 0) {
+    console.log(`── Local .md files (${mdFiles.length} found) ──`)
+    for (const file of mdFiles) {
+      console.log(`  ${basename(file)}`)
+      const rules = await processLocalMd(file)
+      const stored = await storeRules(rules)
+      totalRules += stored
+    }
+  } else {
+    console.log('── No .md files in knowledge/ (add some to get started) ──')
   }
 
-  console.log(`  Extracting from ${text.length} chars...`)
-  const rules = await extractRules(text, url, lang)
-  console.log(`  Found ${rules.length} rules`)
+  // ── 2. Local HTML files (DeepSeek extraction) ────────────────────────────────
+  const htmlDir = join(ROOT, 'knowledge', 'html')
+  const htmlFiles = await findFiles(htmlDir, '.html')
 
-  const stored = await storeRules(rules)
-  return stored
-}
+  if (htmlFiles.length > 0) {
+    console.log(`\n── Local HTML files (${htmlFiles.length} found) ──`)
+    for (const file of htmlFiles) {
+      console.log(`  ${basename(file)}`)
+      const html = await readFile(file, 'utf8')
+      const text = htmlToText(html)
+      if (text.length < 300) { console.log(`  Too short, skipping`); continue }
+      console.log(`  Extracting from ${text.length} chars...`)
+      const rules = await extractRules(text, `local:${basename(file)}`, 'en')
+      console.log(`  Found ${rules.length} rules`)
+      const stored = await storeRules(rules)
+      totalRules += stored
+    }
+  } else {
+    console.log('\n── No HTML files in knowledge/html/ (drop .html files there) ──')
+  }
 
-async function main() {
-  console.log('=== BaZi Knowledge Scraper started ===')
-  console.log(`Time: ${new Date().toISOString()}`)
-
-  let totalPages = 0
-  let totalRules = 0
+  // ── 3. Web scraping ──────────────────────────────────────────────────────────
+  console.log('\n── Web sources ──')
   const visited = new Set()
 
   for (const { url, lang, discover } of INDEX_PAGES) {
@@ -243,13 +352,8 @@ async function main() {
     const html = await fetchPage(url)
     if (!html) continue
 
-    // Process the index page itself
-    const indexRules = await storeRules(
-      await extractRules(htmlToText(html), url, lang)
-    )
-    totalRules += indexRules
+    totalRules += await storeRules(await extractRules(htmlToText(html), url, lang))
 
-    // Discover and process article sub-pages
     if (discover) {
       const links = extractArticleLinks(html, url)
       console.log(`  Discovered ${links.length} article links`)
@@ -259,19 +363,22 @@ async function main() {
         visited.add(link)
 
         console.log(`\n  Article: ${link}`)
-        const stored = await processPage(link, lang)
-        totalRules += stored
-        totalPages++
+        const pageHtml = await fetchPage(link)
+        if (!pageHtml) continue
+        const text = htmlToText(pageHtml)
+        if (text.length < 300) { console.log(`  Too short, skipping`); continue }
+        console.log(`  Extracting from ${text.length} chars...`)
+        const rules = await extractRules(text, link, lang)
+        console.log(`  Found ${rules.length} rules`)
+        totalRules += await storeRules(rules)
 
-        // Be polite to servers: 1.5s between requests
         await sleep(1500)
       }
     }
   }
 
-  console.log('\n=== Scraper complete ===')
-  console.log(`Pages processed: ${totalPages}`)
-  console.log(`Rules stored: ${totalRules}`)
+  console.log('\n=== Done ===')
+  console.log(`Total rules stored/updated: ${totalRules}`)
 }
 
 main().catch(err => {
