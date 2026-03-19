@@ -1,9 +1,10 @@
 import type { UserProfile, AuthState, DailyReading } from '../engine/types'
 
 const KEYS = {
-  AUTH:    'baczi_auth',
-  PROFILE: 'baczi_profile',
-  READING: 'baczi_reading',  // { date, data }
+  AUTH:        'baczi_auth',
+  PROFILE:     'baczi_profile',
+  READING:     'baczi_reading',  // { date, data }
+  ADMIN_TOKEN: 'baczi_admin_token',
 } as const
 
 export function saveAuth(auth: AuthState) {
@@ -54,6 +55,18 @@ export function loadTodayReading(): DailyReading | null {
   } catch {
     return null
   }
+}
+
+export function saveAdminToken(token: string) {
+  localStorage.setItem(KEYS.ADMIN_TOKEN, token)
+}
+
+export function loadAdminToken(): string | null {
+  return localStorage.getItem(KEYS.ADMIN_TOKEN)
+}
+
+export function clearAdminToken() {
+  localStorage.removeItem(KEYS.ADMIN_TOKEN)
 }
 
 export function clearAll() {

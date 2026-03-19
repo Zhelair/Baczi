@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Settings2, Zap, Save, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
-import { loadAuth } from '../utils/storage'
+import { loadAuth, loadAdminToken } from '../utils/storage'
 
 interface AiConfig {
   model: string
@@ -31,13 +31,13 @@ const DEFAULT_CONFIG: Config = {
   },
 }
 
-async function adminFetch(method: string, body?: unknown) {
-  const auth = loadAuth()
+async function adminFetch(method: string, body?: unknown, tokenOverride?: string) {
+  const token = tokenOverride ?? loadAdminToken() ?? loadAuth()?.token ?? ''
   const res = await fetch(method === 'GET' ? '/api/admin?key=all' : '/api/admin', {
     method,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${auth?.token ?? ''}`,
+      Authorization: `Bearer ${token}`,
     },
     body: body ? JSON.stringify(body) : undefined,
   })
@@ -80,7 +80,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 const INPUT = 'w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition-colors'
 
-export default function AdminPanel() {
+export default function AdminPanel({ adminToken }: { adminToken?: string } = {}) {
   const [config, setConfig] = useState<Config>(DEFAULT_CONFIG)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<'ai' | 'bazi' | null>(null)
@@ -92,7 +92,7 @@ export default function AdminPanel() {
     setLoading(true)
     setError('')
     try {
-      const data = await adminFetch('GET') as Partial<Config>
+      const data = await adminFetch('GET', undefined, adminToken) as Partial<Config>
       setConfig({
         ai:   { ...DEFAULT_CONFIG.ai,   ...(data.ai   ?? {}) },
         bazi: { ...DEFAULT_CONFIG.bazi, ...(data.bazi ?? {}) },
@@ -102,7 +102,7 @@ export default function AdminPanel() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [adminToken])
 
   useEffect(() => { load() }, [load])
 
@@ -110,7 +110,7 @@ export default function AdminPanel() {
     setSaving(key)
     setError('')
     try {
-      await adminFetch('POST', { key, value: config[key] })
+      await adminFetch('POST', { key, value: config[key] }, adminToken)
       setSaved(key)
       setTimeout(() => setSaved(null), 2000)
     } catch (e) {
