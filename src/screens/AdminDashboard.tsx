@@ -18,7 +18,7 @@ export default function AdminDashboard({ onGoToApp }: Props) {
   if (view === 'config') {
     return (
       <div className="min-h-screen bg-zinc-950">
-        <div className="max-w-lg mx-auto px-4 pt-4">
+        <div className="max-w-2xl mx-auto px-4 pt-4">
           <button
             onClick={() => setView('home')}
             className="mb-4 text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-1 transition-colors"

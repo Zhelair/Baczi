@@ -128,20 +128,22 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950">
-      {tab === 'today'    && <Today profile={profile} lang={lang} />}
-      {tab === 'chart'    && <MyChart profile={profile} lang={lang} />}
-      {tab === 'lucky'    && <LuckyDates profile={profile} lang={lang} />}
-      {tab === 'ask'      && chart && <AskBazi chart={chart} lang={lang} />}
-      {tab === 'settings' && (
-        <Settings
-          profile={profile}
-          lang={lang}
-          onLangChange={handleLangChange}
-          onThemeChange={handleThemeChange}
-          onReset={handleReset}
-        />
-      )}
-      {tab === 'admin' && tier === 'admin' && <AdminPanel />}
+      <div className="md:pl-52">
+        {tab === 'today'    && <Today profile={profile} lang={lang} />}
+        {tab === 'chart'    && <MyChart profile={profile} lang={lang} />}
+        {tab === 'lucky'    && <LuckyDates profile={profile} lang={lang} />}
+        {tab === 'ask'      && chart && <AskBazi chart={chart} lang={lang} />}
+        {tab === 'settings' && (
+          <Settings
+            profile={profile}
+            lang={lang}
+            onLangChange={handleLangChange}
+            onThemeChange={handleThemeChange}
+            onReset={handleReset}
+          />
+        )}
+        {tab === 'admin' && tier === 'admin' && <AdminPanel />}
+      </div>
       <TabBar active={tab} onSelect={setTab} lang={lang} tier={tier} />
     </div>
   )
