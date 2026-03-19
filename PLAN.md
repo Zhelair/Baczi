@@ -2,7 +2,7 @@
 
 ## Overview
 
-A **local-first Progressive Web App (PWA)** that calculates personalized BaZi (Four Pillars of Destiny) charts and delivers daily readings in **Bulgarian, Russian, and English**.
+A **local-first web app** that calculates personalized BaZi (Four Pillars of Destiny) charts and delivers daily readings in **Bulgarian, Russian, and English**. Hosted on Vercel, accessible via any browser — no installation required.
 
 No scraping. No database. No stored personal data. Fully legal. Fully private.
 
@@ -23,7 +23,6 @@ No scraping. No database. No stored personal data. Fully legal. Fully private.
 | Layer | Technology | Why |
 |-------|-----------|-----|
 | Frontend | React 18 + Vite + Tailwind CSS | Fast, familiar, mobile-first |
-| PWA | Vite PWA plugin | Installable on any device |
 | BaZi Engine | `lunar-javascript` (JS library) | Complete Chinese calendar, well-tested |
 | AI | DeepSeek V3 API | ~10x cheaper than Claude, excellent quality |
 | API Proxy | Vercel Serverless Functions (free tier) | Hides DeepSeek API key from frontend |
@@ -35,7 +34,7 @@ No scraping. No database. No stored personal data. Fully legal. Fully private.
 ## Architecture
 
 ```
-User's Device (Browser / PWA)
+User's Device (Browser)
 ├── Birth data           → localStorage only, never sent anywhere
 ├── Calculated chart     → computed locally by BaZi engine
 ├── Cached daily reading → localStorage, refreshes each day
@@ -108,7 +107,7 @@ Language toggle visible on every screen. Preference saved in localStorage.
 Вашето ime:          [Ivan              ]
 Дата на раждане:     [31.10.1992        ]  ← DD.MM.YYYY
 Час на раждане:      [16:30             ]  ← HH:MM (optional)
-Пол:                 ◉ Мъж  ○ Жена  ○ Не желая да посоча
+Пол:                 ◉ Мъж  ○ Жена
 Език:                ◉ BG  ○ RU  ○ EN
 
               [ 🔮 Изчисли картата → ]
@@ -310,7 +309,7 @@ baczi/
 - [ ] 3-language support (BG/RU/EN)
 - [ ] localStorage persistence
 - [ ] Mobile-first responsive design
-- [ ] PWA manifest (installable)
+- [ ] Passphrase auth gate (JWT, validated server-side on all API calls)
 
 ### Phase 2 — Enhanced
 - [ ] 10-year luck cycle timeline visualization
@@ -328,14 +327,32 @@ baczi/
 
 ---
 
+## Authentication — Passphrase System
+
+Simple shared-secret gate. Mom shares the passphrase with paying customers.
+
+**Flow:**
+```
+1. User opens app → sees passphrase prompt
+2. Enters passphrase → POST /api/auth
+3. Vercel checks: passphrase === process.env.APP_PASSPHRASE
+4. ✅ Match → returns signed session token (JWT, 30-day expiry)
+5. Token stored in localStorage
+6. All subsequent API calls include token in Authorization header
+7. ❌ Wrong passphrase → "Invalid passphrase" error
+```
+
+**No API keys are ever in the frontend bundle. Ever.**
+
+---
+
 ## Environment Variables
 
 ```env
-# Vercel serverless function only (never in frontend)
+# Vercel env vars only — never committed to git, never in frontend
 DEEPSEEK_API_KEY=sk-...
-
-# Frontend (public, safe to expose)
-VITE_API_BASE_URL=https://your-app.vercel.app
+APP_PASSPHRASE=some-secret-your-mom-shares
+JWT_SECRET=another-random-secret-for-signing-tokens
 ```
 
 ---
@@ -346,7 +363,7 @@ VITE_API_BASE_URL=https://your-app.vercel.app
 2. Connect repo to Vercel (free tier)
 3. Set `DEEPSEEK_API_KEY` in Vercel env vars
 4. Deploy → get HTTPS URL
-5. Share link in Telegram — opens as PWA on mobile
+5. Share link in Telegram — opens as regular web page in any browser
 
 **Cost: €0/month** (Vercel free tier handles 50 users easily)
 
