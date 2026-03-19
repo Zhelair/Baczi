@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Passphrase from './screens/Passphrase'
 import Setup from './screens/Setup'
+import LangSelect from './screens/LangSelect'
 import Today from './screens/Today'
 import MyChart from './screens/MyChart'
 import LuckyDates from './screens/LuckyDates'
@@ -9,11 +10,12 @@ import AskBazi from './screens/AskBazi'
 import AdminPanel from './screens/AdminPanel'
 import AdminDashboard from './screens/AdminDashboard'
 import TabBar, { type Tab } from './components/TabBar'
-import { loadAuth, loadProfile, saveProfile, clearAll } from './utils/storage'
+import { loadAuth, loadProfile, saveProfile, saveLang, loadLang, clearAll } from './utils/storage'
+import { useDailyReminder } from './utils/dailyReminder'
 import { calculateChart } from './engine/baziCalculator'
 import type { Language, Theme, Tier, UserProfile } from './engine/types'
 
-type AppState = 'passphrase' | 'setup' | 'admin' | 'app'
+type AppState = 'lang' | 'passphrase' | 'setup' | 'admin' | 'app'
 
 function applyTheme(theme: Theme | undefined) {
   const t = theme ?? 'dark'
@@ -22,12 +24,13 @@ function applyTheme(theme: Theme | undefined) {
 
 export default function App() {
   const [state, setState] = useState<AppState>(() => {
+    if (!loadLang()) return 'lang'
     if (!loadAuth()) return 'passphrase'
     if (!loadProfile()) return 'setup'
     return 'app'
   })
   const [profile, setProfile] = useState<UserProfile | null>(() => loadProfile())
-  const [lang, setLang] = useState<Language>(() => loadProfile()?.language ?? 'bg')
+  const [lang, setLang] = useState<Language>(() => loadLang() ?? loadProfile()?.language ?? 'bg')
   const [tab, setTab] = useState<Tab>('today')
   const tier = loadAuth()?.tier as Tier | undefined
 
@@ -51,6 +54,15 @@ export default function App() {
   useEffect(() => {
     if (state === 'app' && !loadAuth()) setState('passphrase')
   }, [state])
+
+  // Daily 10:30 summary notification
+  useDailyReminder(chart, lang)
+
+  function handleLangSelect(newLang: Language) {
+    saveLang(newLang)
+    setLang(newLang)
+    setState('passphrase')
+  }
 
   function handleAuthSuccess() {
     const auth = loadAuth()
@@ -76,6 +88,7 @@ export default function App() {
   }
 
   function handleLangChange(newLang: Language) {
+    saveLang(newLang)
     setLang(newLang)
     if (profile) {
       const updated = { ...profile, language: newLang }
@@ -99,6 +112,10 @@ export default function App() {
     setLang('bg')
     applyTheme('dark')
     setState('passphrase')
+  }
+
+  if (state === 'lang') {
+    return <LangSelect onSelect={handleLangSelect} />
   }
 
   if (state === 'passphrase') {

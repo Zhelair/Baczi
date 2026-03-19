@@ -8,11 +8,13 @@ export interface ChatSession {
 }
 
 const KEYS = {
-  AUTH:        'baczi_auth',
-  PROFILE:     'baczi_profile',
-  READING:     'baczi_reading',  // { date, data }
-  ADMIN_TOKEN: 'baczi_admin_token',
-  SESSIONS:    'baczi_sessions',
+  AUTH:          'baczi_auth',
+  PROFILE:       'baczi_profile',
+  READING:       'baczi_reading',
+  ADMIN_TOKEN:   'baczi_admin_token',
+  SESSIONS:      'baczi_sessions',
+  LANG:          'baczi_lang',
+  REMINDER_DATE: 'baczi_reminder_date',
 } as const
 
 export function saveAuth(auth: AuthState) {
@@ -75,6 +77,23 @@ export function loadAdminToken(): string | null {
 
 export function clearAdminToken() {
   localStorage.removeItem(KEYS.ADMIN_TOKEN)
+}
+
+export function loadLang(): import('../engine/types').Language | null {
+  const v = localStorage.getItem(KEYS.LANG)
+  return (v === 'bg' || v === 'ru' || v === 'en') ? v : null
+}
+
+export function saveLang(lang: import('../engine/types').Language) {
+  localStorage.setItem(KEYS.LANG, lang)
+}
+
+export function loadReminderDate(): string | null {
+  return localStorage.getItem(KEYS.REMINDER_DATE)
+}
+
+export function saveReminderDate(date: string) {
+  localStorage.setItem(KEYS.REMINDER_DATE, date)
 }
 
 export function loadChatSessions(): ChatSession[] {

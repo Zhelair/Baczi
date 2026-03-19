@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Sparkles, History, Download, Trash2, FolderOpen, X, Save } from 'lucide-react'
+import { Send, Sparkles, History, Download, Trash2, FolderOpen, X, Save, Upload, Volume2, VolumeX, Mic } from 'lucide-react'
 import { loadAuth, loadChatSessions, saveChatSessions, type ChatSession } from '../utils/storage'
+import { speak, stopSpeaking, ttsAvailable } from '../utils/tts'
 import type { BaziChart } from '../engine/types'
 import type { Language } from '../engine/types'
 
@@ -60,7 +61,41 @@ export default function AskBazi({ chart, lang }: Props) {
   const [sessions, setSessions] = useState<ChatSession[]>(() => loadChatSessions())
   const [saveName, setSaveName] = useState('')
   const [showSaveInput, setShowSaveInput] = useState(false)
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null)
+  const importRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading])
+
+  // Stop TTS when unmounting
+  useEffect(() => () => stopSpeaking(), [])
+
+  function speakMessage(idx: number, text: string) {
+    if (speakingIdx === idx) {
+      stopSpeaking()
+      setSpeakingIdx(null)
+      return
+    }
+    setSpeakingIdx(idx)
+    speak(text, lang, () => setSpeakingIdx(null))
+  }
+
+  function readAll() {
+    const assistantTexts = messages
+      .filter(m => m.role === 'assistant')
+      .map(m => m.content)
+      .join(' ... ')
+    if (!assistantTexts) return
+    setSpeakingIdx(-1) // -1 = reading all
+    speak(assistantTexts, lang, () => setSpeakingIdx(null))
+  }
+
+  function stopAll() {
+    stopSpeaking()
+    setSpeakingIdx(null)
+  }
 
   function saveSession() {
     const name = saveName.trim() || new Date().toLocaleDateString(lang === 'bg' ? 'bg-BG' : lang === 'ru' ? 'ru-RU' : 'en-GB')
@@ -88,9 +123,35 @@ export default function AskBazi({ chart, lang }: Props) {
     setShowHistory(false)
   }
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
+  function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      try {
+        const parsed = JSON.parse(ev.target?.result as string) as Partial<ChatSession>
+        if (!parsed.messages || !Array.isArray(parsed.messages)) {
+          alert(lang === 'bg' ? 'Невалиден файл' : lang === 'ru' ? 'Неверный файл' : 'Invalid file format')
+          return
+        }
+        const imported: ChatSession = {
+          id: Date.now().toString(),
+          name: parsed.name ?? file.name.replace('.json', ''),
+          date: parsed.date ?? new Date().toISOString().split('T')[0],
+          messages: parsed.messages,
+        }
+        const updated = [imported, ...sessions]
+        saveChatSessions(updated)
+        setSessions(updated)
+        setShowHistory(true)
+      } catch {
+        alert(lang === 'bg' ? 'Грешка при четене на файла' : lang === 'ru' ? 'Ошибка чтения файла' : 'Error reading file')
+      }
+    }
+    reader.readAsText(file)
+    // Reset so same file can be imported again
+    e.target.value = ''
+  }
 
   async function send(text?: string) {
     const content = (text ?? input).trim()
@@ -131,7 +192,6 @@ export default function AskBazi({ chart, lang }: Props) {
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply! }])
 
-      // Update balance in storage
       if (data.balance !== undefined) {
         const stored = loadAuth()
         if (stored) {
@@ -155,9 +215,19 @@ export default function AskBazi({ chart, lang }: Props) {
   }
 
   const empty = messages.length === 0
+  const assistantCount = messages.filter(m => m.role === 'assistant').length
 
   return (
     <div className="flex flex-col h-screen pb-20 md:pb-0 max-w-3xl mx-auto w-full">
+      {/* Hidden file input for import */}
+      <input
+        ref={importRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        onChange={handleImport}
+      />
+
       {/* Header */}
       <div className="px-4 pt-6 pb-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-1">
@@ -168,6 +238,27 @@ export default function AskBazi({ chart, lang }: Props) {
             </h2>
           </div>
           <div className="flex items-center gap-1">
+            {/* Read all / stop */}
+            {ttsAvailable && assistantCount > 0 && (
+              speakingIdx !== null ? (
+                <button
+                  onClick={stopAll}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+                >
+                  <VolumeX size={13} />
+                  {lang === 'bg' ? 'Спри' : lang === 'ru' ? 'Стоп' : 'Stop'}
+                </button>
+              ) : (
+                <button
+                  onClick={readAll}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                  title={lang === 'bg' ? 'Прочети всичко' : lang === 'ru' ? 'Читать всё' : 'Read all'}
+                >
+                  <Mic size={13} />
+                  {lang === 'bg' ? 'Прочети' : lang === 'ru' ? 'Читать' : 'Read all'}
+                </button>
+              )
+            )}
             {messages.length > 0 && (
               <button
                 onClick={() => setShowSaveInput(v => !v)}
@@ -183,7 +274,6 @@ export default function AskBazi({ chart, lang }: Props) {
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
                 showHistory ? 'bg-amber-500/10 text-amber-400' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
               }`}
-              title={lang === 'bg' ? 'История' : lang === 'ru' ? 'История' : 'History'}
             >
               <History size={13} />
               {sessions.length > 0 && (
@@ -197,6 +287,7 @@ export default function AskBazi({ chart, lang }: Props) {
         <p className="text-xs text-zinc-500">
           {lang === 'bg' ? '15 жетона на въпрос' : lang === 'ru' ? '15 токенов за вопрос' : '15 tokens per question'}
         </p>
+
         {showSaveInput && (
           <div className="mt-3 flex gap-2">
             <input
@@ -209,22 +300,33 @@ export default function AskBazi({ chart, lang }: Props) {
               className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-amber-500 transition-colors"
             />
             <button onClick={saveSession} className="px-3 py-1.5 rounded-lg bg-amber-500 text-black text-sm font-medium hover:bg-amber-400 transition-colors">
-              {lang === 'bg' ? 'ОК' : lang === 'ru' ? 'ОК' : 'OK'}
+              OK
             </button>
             <button onClick={() => setShowSaveInput(false)} className="px-2 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 transition-colors">
               <X size={14} />
             </button>
           </div>
         )}
+
         {showHistory && (
           <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
             <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
               <span className="text-sm font-medium text-zinc-200">
                 {lang === 'bg' ? 'Запазени сесии' : lang === 'ru' ? 'Сохранённые сессии' : 'Saved sessions'}
               </span>
-              <button onClick={() => setShowHistory(false)} className="text-zinc-600 hover:text-zinc-400">
-                <X size={14} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => importRef.current?.click()}
+                  className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-amber-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-800"
+                  title={lang === 'bg' ? 'Импортирай JSON' : lang === 'ru' ? 'Импорт JSON' : 'Import JSON'}
+                >
+                  <Upload size={12} />
+                  {lang === 'bg' ? 'Импортирай' : lang === 'ru' ? 'Импорт' : 'Import'}
+                </button>
+                <button onClick={() => setShowHistory(false)} className="text-zinc-600 hover:text-zinc-400">
+                  <X size={14} />
+                </button>
+              </div>
             </div>
             {sessions.length === 0 ? (
               <p className="px-4 py-6 text-center text-xs text-zinc-600">
@@ -238,25 +340,17 @@ export default function AskBazi({ chart, lang }: Props) {
                       <p className="text-sm text-zinc-200 truncate">{s.name}</p>
                       <p className="text-xs text-zinc-600">{s.date} · {s.messages.length} {lang === 'bg' ? 'съобщения' : lang === 'ru' ? 'сообщений' : 'messages'}</p>
                     </div>
-                    <button
-                      onClick={() => loadSession(s)}
-                      className="p-1.5 text-zinc-500 hover:text-amber-400 transition-colors"
-                      title={lang === 'bg' ? 'Зареди' : lang === 'ru' ? 'Загрузить' : 'Load'}
-                    >
+                    <button onClick={() => loadSession(s)} className="p-1.5 text-zinc-500 hover:text-amber-400 transition-colors" title="Load">
                       <FolderOpen size={14} />
                     </button>
                     <button
                       onClick={() => downloadJson(s, `bazi-${s.name.replace(/\s+/g, '-')}.json`)}
                       className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-colors"
-                      title={lang === 'bg' ? 'Изтегли' : lang === 'ru' ? 'Скачать' : 'Download'}
+                      title="Download"
                     >
                       <Download size={14} />
                     </button>
-                    <button
-                      onClick={() => deleteSession(s.id)}
-                      className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors"
-                      title={lang === 'bg' ? 'Изтрий' : lang === 'ru' ? 'Удалить' : 'Delete'}
-                    >
+                    <button onClick={() => deleteSession(s.id)} className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors" title="Delete">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -295,14 +389,32 @@ export default function AskBazi({ chart, lang }: Props) {
                 <span className="text-xs">☯</span>
               </div>
             )}
-            <div
-              className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                m.role === 'user'
-                  ? 'bg-amber-500 text-black rounded-br-sm font-medium'
-                  : 'bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-bl-sm'
-              }`}
-            >
-              {m.content}
+            <div className="flex flex-col gap-1 max-w-[82%]">
+              <div
+                className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  m.role === 'user'
+                    ? 'bg-amber-500 text-black rounded-br-sm font-medium'
+                    : 'bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-bl-sm'
+                }`}
+              >
+                {m.content}
+              </div>
+              {/* TTS button for assistant messages */}
+              {m.role === 'assistant' && ttsAvailable && (
+                <button
+                  onClick={() => speakMessage(i, m.content)}
+                  className={`self-start flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs transition-colors ${
+                    speakingIdx === i
+                      ? 'text-amber-400 bg-amber-500/10'
+                      : 'text-zinc-600 hover:text-zinc-400'
+                  }`}
+                >
+                  {speakingIdx === i ? <VolumeX size={11} /> : <Volume2 size={11} />}
+                  {speakingIdx === i
+                    ? (lang === 'bg' ? 'спри' : lang === 'ru' ? 'стоп' : 'stop')
+                    : (lang === 'bg' ? 'прочети' : lang === 'ru' ? 'читать' : 'listen')}
+                </button>
+              )}
             </div>
           </div>
         ))}
