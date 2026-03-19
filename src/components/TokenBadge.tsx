@@ -10,9 +10,10 @@ interface Props {
 }
 
 const TIER_COLORS: Record<Tier, string> = {
-  free: 'text-zinc-400',
-  pro:  'text-amber-400',
-  max:  'text-purple-400',
+  free:  'text-zinc-400',
+  pro:   'text-amber-400',
+  max:   'text-purple-400',
+  admin: 'text-red-400',
 }
 
 export default function TokenBadge({ balance, tier, resetDate, lang }: Props) {

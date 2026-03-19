@@ -5,11 +5,13 @@ import Today from './screens/Today'
 import MyChart from './screens/MyChart'
 import LuckyDates from './screens/LuckyDates'
 import Settings from './screens/Settings'
+import AdminPanel from './screens/AdminPanel'
+import AdminDashboard from './screens/AdminDashboard'
 import TabBar, { type Tab } from './components/TabBar'
 import { loadAuth, loadProfile, saveProfile, clearAll } from './utils/storage'
-import type { Language, Theme, UserProfile } from './engine/types'
+import type { Language, Theme, Tier, UserProfile } from './engine/types'
 
-type AppState = 'passphrase' | 'setup' | 'app'
+type AppState = 'passphrase' | 'setup' | 'admin' | 'app'
 
 function applyTheme(theme: Theme | undefined) {
   const t = theme ?? 'dark'
@@ -25,6 +27,7 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(() => loadProfile())
   const [lang, setLang] = useState<Language>(() => loadProfile()?.language ?? 'bg')
   const [tab, setTab] = useState<Tab>('today')
+  const tier = loadAuth()?.tier as Tier | undefined
 
   // Apply theme on mount and whenever profile.theme changes
   useEffect(() => {
@@ -36,6 +39,11 @@ export default function App() {
   }, [state])
 
   function handleAuthSuccess() {
+    const auth = loadAuth()
+    if (auth?.tier === 'admin') {
+      setState('admin')
+      return
+    }
     if (loadProfile()) {
       setState('app')
     } else {
@@ -83,6 +91,19 @@ export default function App() {
     return <Passphrase lang={lang} onSuccess={handleAuthSuccess} />
   }
 
+  // Admin lands on their own dashboard, can optionally jump into the full app
+  if (state === 'admin') {
+    return (
+      <AdminDashboard
+        lang={lang}
+        onGoToApp={() => {
+          if (loadProfile()) setState('app')
+          else setState('setup')
+        }}
+      />
+    )
+  }
+
   if (state === 'setup') {
     return <Setup lang={lang} onDone={handleSetupDone} />
   }
@@ -105,7 +126,8 @@ export default function App() {
           onReset={handleReset}
         />
       )}
-      <TabBar active={tab} onSelect={setTab} lang={lang} />
+      {tab === 'admin' && tier === 'admin' && <AdminPanel />}
+      <TabBar active={tab} onSelect={setTab} lang={lang} tier={tier} />
     </div>
   )
 }
