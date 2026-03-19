@@ -334,13 +334,31 @@ baczi/
 Mom shares passphrases with customers. Each tier has its own passphrase.
 Multiple people can share a passphrase, but the daily limit is shared too.
 
-### Tiers
+### Tiers & Token Economy
 
-| Tier | Daily Limit | Features |
-|------|-------------|----------|
-| FREE | 5 uses/day | Basic chart + today's reading |
-| PRO  | 30 uses/day | + Lucky dates calendar |
-| MAX  | 100 uses/day | + Monthly forecast (Phase 2) |
+Each action costs tokens. Balances reset on the 1st of each month.
+
+| Tier | Monthly Tokens | Features |
+|------|---------------|----------|
+| FREE | 500 | Basic chart + today's reading |
+| PRO  | 2,000 | + Lucky dates calendar |
+| MAX  | 10,000 | + Monthly forecast (Phase 2) |
+
+| Action | Token Cost |
+|--------|-----------|
+| Full daily reading (AI) | 50 |
+| Quick luck check | 20 |
+| Lucky dates calendar | 30 |
+| View my chart | 0 (free) |
+
+Mom adds passphrases manually in Vercel env vars. Multiple people can
+share one passphrase — they share the token balance. More people = faster burn.
+
+```
+FREE_PASSPHRASES=word1,word2,word3
+PRO_PASSPHRASES=proword1,proword2
+MAX_PASSPHRASES=vipword1
+```
 
 ### Auth Flow
 ```
@@ -354,15 +372,13 @@ Multiple people can share a passphrase, but the daily limit is shared too.
 8. ❌ Limit exceeded → 429 "Daily limit reached, resets at midnight UTC"
 ```
 
-### Rate Limiting (Vercel KV — free tier)
+### Token Balances (Vercel KV — free tier)
 ```
-Stores ONLY daily counters (no personal data):
-  rate:free:2026-03-19 → 12
-  rate:pro:2026-03-19  → 47
-  rate:max:2026-03-19  → 3
+Stores ONLY token balances keyed by passphrase hash (no personal data):
+  tokens:{sha256(passphrase)} → { balance: 450, tier: "free", resetDate: "2026-04-01" }
 
-Resets: UTC midnight (simple, reliable)
-Storage: ~100 bytes/day total — well within Vercel KV free tier
+Resets: 1st of each month (monthly allowance refill)
+Storage: ~200 bytes/passphrase — well within Vercel KV free tier
 ```
 
 **No API keys are ever in the frontend bundle. Ever.**

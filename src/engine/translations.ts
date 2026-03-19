@@ -1,0 +1,124 @@
+import type { Language, ElementKey } from './types'
+
+// ─── Heavenly Stems (天干) ───────────────────────────────────────────────────
+export const STEMS: Record<string, { elementKey: ElementKey; polarity: Record<Language, string>; element: Record<Language, string> }> = {
+  '甲': { elementKey: 'wood',  polarity: { bg: 'Ян', ru: 'Ян', en: 'Yang' }, element: { bg: 'Дърво', ru: 'Дерево', en: 'Wood' } },
+  '乙': { elementKey: 'wood',  polarity: { bg: 'Ин', ru: 'Инь', en: 'Yin'  }, element: { bg: 'Дърво', ru: 'Дерево', en: 'Wood' } },
+  '丙': { elementKey: 'fire',  polarity: { bg: 'Ян', ru: 'Ян', en: 'Yang' }, element: { bg: 'Огън',  ru: 'Огонь',  en: 'Fire' } },
+  '丁': { elementKey: 'fire',  polarity: { bg: 'Ин', ru: 'Инь', en: 'Yin'  }, element: { bg: 'Огън',  ru: 'Огонь',  en: 'Fire' } },
+  '戊': { elementKey: 'earth', polarity: { bg: 'Ян', ru: 'Ян', en: 'Yang' }, element: { bg: 'Земя',  ru: 'Земля',  en: 'Earth'} },
+  '己': { elementKey: 'earth', polarity: { bg: 'Ин', ru: 'Инь', en: 'Yin'  }, element: { bg: 'Земя',  ru: 'Земля',  en: 'Earth'} },
+  '庚': { elementKey: 'metal', polarity: { bg: 'Ян', ru: 'Ян', en: 'Yang' }, element: { bg: 'Метал', ru: 'Металл', en: 'Metal'} },
+  '辛': { elementKey: 'metal', polarity: { bg: 'Ин', ru: 'Инь', en: 'Yin'  }, element: { bg: 'Метал', ru: 'Металл', en: 'Metal'} },
+  '壬': { elementKey: 'water', polarity: { bg: 'Ян', ru: 'Ян', en: 'Yang' }, element: { bg: 'Вода',  ru: 'Вода',   en: 'Water'} },
+  '癸': { elementKey: 'water', polarity: { bg: 'Ин', ru: 'Инь', en: 'Yin'  }, element: { bg: 'Вода',  ru: 'Вода',   en: 'Water'} },
+}
+
+// ─── Earthly Branches (地支) ─────────────────────────────────────────────────
+export const BRANCHES: Record<string, { elementKey: ElementKey; animal: Record<Language, string>; element: Record<Language, string>; hours: string }> = {
+  '子': { elementKey: 'water', animal: { bg: 'Плъх',    ru: 'Крыса',   en: 'Rat'     }, element: { bg: 'Вода',  ru: 'Вода',   en: 'Water'}, hours: '23:00-01:00' },
+  '丑': { elementKey: 'earth', animal: { bg: 'Вол',     ru: 'Бык',     en: 'Ox'      }, element: { bg: 'Земя',  ru: 'Земля',  en: 'Earth'}, hours: '01:00-03:00' },
+  '寅': { elementKey: 'wood',  animal: { bg: 'Тигър',   ru: 'Тигр',    en: 'Tiger'   }, element: { bg: 'Дърво', ru: 'Дерево', en: 'Wood' }, hours: '03:00-05:00' },
+  '卯': { elementKey: 'wood',  animal: { bg: 'Заек',    ru: 'Кролик',  en: 'Rabbit'  }, element: { bg: 'Дърво', ru: 'Дерево', en: 'Wood' }, hours: '05:00-07:00' },
+  '辰': { elementKey: 'earth', animal: { bg: 'Дракон',  ru: 'Дракон',  en: 'Dragon'  }, element: { bg: 'Земя',  ru: 'Земля',  en: 'Earth'}, hours: '07:00-09:00' },
+  '巳': { elementKey: 'fire',  animal: { bg: 'Змия',    ru: 'Змея',    en: 'Snake'   }, element: { bg: 'Огън',  ru: 'Огонь',  en: 'Fire' }, hours: '09:00-11:00' },
+  '午': { elementKey: 'fire',  animal: { bg: 'Кон',     ru: 'Лошадь',  en: 'Horse'   }, element: { bg: 'Огън',  ru: 'Огонь',  en: 'Fire' }, hours: '11:00-13:00' },
+  '未': { elementKey: 'earth', animal: { bg: 'Коза',    ru: 'Коза',    en: 'Goat'    }, element: { bg: 'Земя',  ru: 'Земля',  en: 'Earth'}, hours: '13:00-15:00' },
+  '申': { elementKey: 'metal', animal: { bg: 'Маймуна', ru: 'Обезьяна',en: 'Monkey'  }, element: { bg: 'Метал', ru: 'Металл', en: 'Metal'}, hours: '15:00-17:00' },
+  '酉': { elementKey: 'metal', animal: { bg: 'Петел',   ru: 'Петух',   en: 'Rooster' }, element: { bg: 'Метал', ru: 'Металл', en: 'Metal'}, hours: '17:00-19:00' },
+  '戌': { elementKey: 'earth', animal: { bg: 'Куче',    ru: 'Собака',  en: 'Dog'     }, element: { bg: 'Земя',  ru: 'Земля',  en: 'Earth'}, hours: '19:00-21:00' },
+  '亥': { elementKey: 'water', animal: { bg: 'Прасе',   ru: 'Свинья',  en: 'Pig'     }, element: { bg: 'Вода',  ru: 'Вода',   en: 'Water'}, hours: '21:00-23:00' },
+}
+
+// ─── UI strings ───────────────────────────────────────────────────────────────
+export const UI: Record<string, Record<Language, string>> = {
+  // Screens
+  today:           { bg: 'Днес',        ru: 'Сегодня',   en: 'Today'       },
+  chart:           { bg: 'Картата',     ru: 'Карта',     en: 'Chart'       },
+  lucky:           { bg: 'Дни на удача',ru: 'Удача',     en: 'Lucky Dates' },
+  settings:        { bg: 'Настройки',   ru: 'Настройки', en: 'Settings'    },
+  // Auth
+  passphraseTitle: { bg: '🔮 Въведи паролата', ru: '🔮 Введи пароль', en: '🔮 Enter Passphrase' },
+  passphraseHint:  { bg: 'Паролата ти е получена при покупка', ru: 'Пароль получен при покупке', en: 'Your passphrase was provided upon purchase' },
+  passphraseLabel: { bg: 'Парола',       ru: 'Пароль',    en: 'Passphrase'  },
+  enter:           { bg: 'Влез',         ru: 'Войти',     en: 'Enter'       },
+  // Setup
+  setupTitle:      { bg: '✨ Твоята БаЦзи карта', ru: '✨ Твоя Ба-Цзы карта', en: '✨ Your BaZi Chart' },
+  yourName:        { bg: 'Твоето иvme',  ru: 'Ваше имя',  en: 'Your name'   },
+  birthDate:       { bg: 'Дата на раждане (ДД.ММ.ГГГГ)', ru: 'Дата рождения (ДД.ММ.ГГГГ)', en: 'Birth date (DD.MM.YYYY)' },
+  birthTime:       { bg: 'Час на раждане (ЧЧ:ММ) — незадължително', ru: 'Время рождения (ЧЧ:ММ) — необязательно', en: 'Birth time (HH:MM) — optional' },
+  male:            { bg: 'Мъж',          ru: 'Мужчина',   en: 'Male'        },
+  female:          { bg: 'Жена',         ru: 'Женщина',   en: 'Female'      },
+  gender:          { bg: 'Пол',          ru: 'Пол',       en: 'Gender'      },
+  calculate:       { bg: '🔮 Изчисли картата', ru: '🔮 Рассчитать карту', en: '🔮 Calculate Chart' },
+  // Pillars
+  yearPillar:      { bg: 'Година',       ru: 'Год',       en: 'Year'        },
+  monthPillar:     { bg: 'Месец',        ru: 'Месяц',     en: 'Month'       },
+  dayPillar:       { bg: 'Ден',          ru: 'День',      en: 'Day'         },
+  hourPillar:      { bg: 'Час',          ru: 'Час',       en: 'Hour'        },
+  unknownHour:     { bg: 'Неизвестен',   ru: 'Неизвестно',en: 'Unknown'     },
+  dayMaster:       { bg: 'Господар на деня', ru: 'Хозяин дня', en: 'Day Master' },
+  zodiac:          { bg: 'Зодия',        ru: 'Зодиак',    en: 'Zodiac'      },
+  luckCycles:      { bg: 'Цикли на удача', ru: 'Циклы удачи', en: 'Luck Cycles' },
+  // Life areas
+  finance:         { bg: 'Финанси',      ru: 'Финансы',   en: 'Finance'     },
+  work:            { bg: 'Работа',       ru: 'Работа',    en: 'Work'        },
+  love:            { bg: 'Любов',        ru: 'Любовь',    en: 'Love'        },
+  health:          { bg: 'Здраве',       ru: 'Здоровье',  en: 'Health'      },
+  travel:          { bg: 'Пътувания',    ru: 'Путешествия',en: 'Travel'     },
+  creativity:      { bg: 'Творчество',   ru: 'Творчество',en: 'Creativity'  },
+  home:            { bg: 'Дом',          ru: 'Дом',       en: 'Home'        },
+  legal:           { bg: 'Договори',     ru: 'Договоры',  en: 'Legal'       },
+  // Today screen
+  todayEnergy:     { bg: 'Енергията на деня', ru: 'Энергия дня', en: "Today's Energy" },
+  yourReading:     { bg: 'Личното ти четене', ru: 'Ваше чтение', en: 'Your Reading'   },
+  luckyHours:      { bg: 'Щастливи часове', ru: 'Удачные часы', en: 'Lucky Hours'     },
+  getReading:      { bg: '🔮 Вземи дневното четене (50 жетона)', ru: '🔮 Получить дневное чтение (50 жетонов)', en: '🔮 Get Daily Reading (50 tokens)' },
+  quickLuck:       { bg: '⚡ Бърза проверка (20 жетона)', ru: '⚡ Быстрая проверка (20 жетонов)', en: '⚡ Quick Luck Check (20 tokens)' },
+  loading:         { bg: 'Зареждане...', ru: 'Загрузка...', en: 'Loading...' },
+  // Tokens
+  tokens:          { bg: 'жетони',       ru: 'жетонов',   en: 'tokens'      },
+  tokensLeft:      { bg: 'Оставащи жетони', ru: 'Оставшиеся жетоны', en: 'Tokens remaining' },
+  resetsOn:        { bg: 'Нулира се на', ru: 'Сброс',      en: 'Resets on'   },
+  // Errors
+  errorInvalid:    { bg: 'Невалидна парола', ru: 'Неверный пароль', en: 'Invalid passphrase' },
+  errorTokens:     { bg: 'Жетоните свършиха. Нулира се на 1-ви.', ru: 'Жетоны закончились. Сброс 1-го числа.', en: 'Out of tokens. Resets on the 1st.' },
+  errorGeneral:    { bg: 'Нещо се обърка. Опитай пак.', ru: 'Что-то пошло не так. Попробуйте снова.', en: 'Something went wrong. Try again.' },
+  // Settings
+  editProfile:     { bg: 'Редактирай профил', ru: 'Редактировать профиль', en: 'Edit Profile' },
+  language:        { bg: 'Език',         ru: 'Язык',      en: 'Language'    },
+  clearData:       { bg: 'Изчисти всички данни', ru: 'Очистить все данные', en: 'Clear All Data' },
+  clearConfirm:    { bg: 'Сигурен ли си? Всички данни ще бъдат изтрити.', ru: 'Уверены? Все данные будут удалены.', en: 'Are you sure? All data will be deleted.' },
+  tier:            { bg: 'Ниво',         ru: 'Уровень',   en: 'Tier'        },
+  free:            { bg: 'Безплатен',    ru: 'Бесплатный',en: 'Free'        },
+  pro:             { bg: 'Про',          ru: 'Про',       en: 'Pro'         },
+  max:             { bg: 'Макс',         ru: 'Макс',      en: 'Max'         },
+}
+
+// ─── Life area emojis ─────────────────────────────────────────────────────────
+export const LIFE_AREA_EMOJIS: Record<string, string> = {
+  finance:    '💰',
+  work:       '💼',
+  love:       '❤️',
+  health:     '🌿',
+  travel:     '✈️',
+  creativity: '🎨',
+  home:       '🏠',
+  legal:      '📝',
+}
+
+export function t(key: string, lang: Language): string {
+  return UI[key]?.[lang] ?? UI[key]?.['en'] ?? key
+}
+
+export function stemLabel(gan: string, lang: Language): { element: string; polarity: string; elementKey: ElementKey } {
+  const s = STEMS[gan]
+  if (!s) return { element: gan, polarity: '', elementKey: 'earth' }
+  return { element: s.element[lang], polarity: s.polarity[lang], elementKey: s.elementKey }
+}
+
+export function branchLabel(zhi: string, lang: Language): { animal: string; element: string; elementKey: ElementKey } {
+  const b = BRANCHES[zhi]
+  if (!b) return { animal: zhi, element: '', elementKey: 'earth' }
+  return { animal: b.animal[lang], element: b.element[lang], elementKey: b.elementKey }
+}
