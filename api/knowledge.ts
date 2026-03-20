@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let query = supabase
       .from('bazi_knowledge')
-      .select('id, pattern, rule_text, school, confidence, tags, source', { count: 'exact' })
+      .select('id, pattern, rule_text, school, confidence, tags, source_url', { count: 'exact' })
       .order('confidence', { ascending: true })  // high < low alphabetically: high first
       .range(from, from + limit - 1)
 
@@ -50,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // POST /api/knowledge — create a new rule
   if (req.method === 'POST') {
-    const { pattern, rule_text, school, confidence, tags, source } = req.body ?? {}
+    const { pattern, rule_text, school, confidence, tags, source_url } = req.body ?? {}
 
     if (!pattern || !rule_text || !school || !confidence) {
       return res.status(400).json({ error: 'pattern, rule_text, school, confidence are required' })
@@ -70,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         school,
         confidence,
         tags: parsedTags,
-        source: source ?? 'admin',
+        source_url: source_url ?? 'admin',
       })
       .select()
       .single()
@@ -98,13 +98,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const id = req.query.id as string | undefined
     if (!id) return res.status(400).json({ error: 'id required' })
 
-    const { pattern, rule_text, school, confidence, tags, source } = req.body ?? {}
+    const { pattern, rule_text, school, confidence, tags, source_url } = req.body ?? {}
     const updates: Record<string, unknown> = {}
     if (pattern    !== undefined) updates.pattern    = pattern
     if (rule_text  !== undefined) updates.rule_text  = rule_text
     if (school     !== undefined) updates.school     = school
     if (confidence !== undefined) updates.confidence = confidence
-    if (source     !== undefined) updates.source     = source
+    if (source_url !== undefined) updates.source_url = source_url
     if (tags !== undefined) {
       updates.tags = Array.isArray(tags)
         ? tags

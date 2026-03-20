@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS bazi_knowledge (
   pattern      TEXT        NOT NULL,  -- e.g. "Geng+Chen" or "year_self_punishment"
   rule_text    TEXT        NOT NULL,  -- extracted rule in clear language (English)
   school       TEXT        NOT NULL DEFAULT 'unknown',  -- "classical", "dong_gong", "joey_yap", etc.
-  source       TEXT        NOT NULL DEFAULT 'admin',  -- e.g. 'admin', 'import', or a URL
+  source_url   TEXT        NOT NULL DEFAULT 'admin',  -- e.g. 'admin', 'import', or a URL
   confidence   TEXT        NOT NULL DEFAULT 'medium' CHECK (confidence IN ('high', 'medium', 'low')),
   tags         TEXT[]      NOT NULL DEFAULT '{}',  -- ["Geng", "Chen", "clash", "day_master"]
   created_at   TIMESTAMPTZ DEFAULT NOW()
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS bazi_knowledge (
 
 -- Unique constraint for upsert (no duplicate rules from same source)
 CREATE UNIQUE INDEX IF NOT EXISTS bazi_knowledge_pattern_source
-  ON bazi_knowledge (pattern, source);
+  ON bazi_knowledge (pattern, source_url);
 
 -- GIN index for fast array overlap queries (tags && ARRAY['Jia', 'Chen'])
 CREATE INDEX IF NOT EXISTS bazi_knowledge_tags_gin
