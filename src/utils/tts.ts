@@ -6,8 +6,8 @@ const LANG_CODE: Record<Language, string> = {
   en: 'en-GB',
 }
 
-/** Remove markdown formatting symbols so TTS doesn't read them aloud. */
-function stripMarkdown(text: string): string {
+/** Remove markdown formatting symbols so TTS doesn't read them aloud, and for clean display. */
+export function stripMarkdown(text: string): string {
   return text
     .replace(/\*\*(.+?)\*\*/gs, '$1')          // **bold**
     .replace(/\*(.+?)\*/gs, '$1')               // *italic*
