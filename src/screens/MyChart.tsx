@@ -1,8 +1,67 @@
 import { useMemo } from 'react'
 import PillarCard from '../components/PillarCard'
 import { calculateChart } from '../engine/baziCalculator'
-import { t } from '../engine/translations'
+import { t, STEMS, BRANCHES } from '../engine/translations'
 import type { Language, UserProfile, LuckCycle } from '../engine/types'
+
+const GAN = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸']
+const ZHI = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥']
+
+function yearGanZhi(year: number): [string, string] {
+  return [
+    GAN[((year - 4) % 10 + 10) % 10],
+    ZHI[((year - 4) % 12 + 12) % 12],
+  ]
+}
+
+function LifeYearsGrid({ birthYear, lang }: { birthYear: number; lang: Language }) {
+  const currentYear = new Date().getFullYear()
+  const startYear = birthYear
+  const endYear   = birthYear + 90
+
+  // Group into rows of 10 columns (decades)
+  const decades: number[][] = []
+  for (let y = startYear; y < endYear; y += 10) {
+    decades.push(Array.from({ length: 10 }, (_, i) => y + i).filter(yr => yr < endYear))
+  }
+
+  return (
+    <section className="mb-6">
+      <h3 className="text-xs uppercase tracking-wider text-zinc-500 mb-3">
+        {lang === 'bg' ? 'Години на живота' : lang === 'ru' ? 'Годы жизни' : 'Life Years'}
+      </h3>
+      <div className="overflow-x-auto -mx-4 px-4">
+        <div className="min-w-max">
+          {decades.map((row, ri) => (
+            <div key={ri} className="flex gap-1 mb-1">
+              {row.map(year => {
+                const [g, z] = yearGanZhi(year)
+                const elemKey = STEMS[g]?.elementKey ?? 'earth'
+                const isNow = year === currentYear
+                return (
+                  <div
+                    key={year}
+                    className={`flex flex-col items-center w-10 rounded-lg px-1 py-1.5 transition-all ${
+                      isNow
+                        ? 'bg-amber-500/15 ring-1 ring-amber-500/50'
+                        : 'bg-zinc-900 hover:bg-zinc-800'
+                    }`}
+                  >
+                    <span className={`text-[9px] leading-none mb-0.5 ${isNow ? 'text-amber-400 font-semibold' : 'text-zinc-600'}`}>
+                      {year}
+                    </span>
+                    <span className={`chinese text-sm leading-none font-medium element-${elemKey}`}>{g}</span>
+                    <span className={`chinese text-sm leading-none element-${BRANCHES[z]?.elementKey ?? 'earth'}`}>{z}</span>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
 
 interface Props {
   profile: UserProfile
@@ -184,6 +243,9 @@ export default function MyChart({ profile, lang }: Props) {
       {chart.luckCycles.length > 0 && (
         <LuckTimeline cycles={chart.luckCycles} birthYear={profile.birthYear} lang={lang} />
       )}
+
+      {/* Life Years grid */}
+      <LifeYearsGrid birthYear={profile.birthYear} lang={lang} />
     </div>
   )
 }

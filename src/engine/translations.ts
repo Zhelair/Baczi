@@ -30,6 +30,22 @@ export const BRANCHES: Record<string, { elementKey: ElementKey; animal: Record<L
   '亥': { elementKey: 'water', animal: { bg: 'Прасе',   ru: 'Свинья',  en: 'Pig'     }, element: { bg: 'Вода',  ru: 'Вода',   en: 'Water'}, hours: '21:00-23:00' },
 }
 
+// ─── Hidden stems (地支藏干) — classical assignments ─────────────────────────
+export const HIDDEN_STEMS: Record<string, string[]> = {
+  '子': ['癸'],
+  '丑': ['己', '癸', '辛'],
+  '寅': ['甲', '丙', '戊'],
+  '卯': ['乙'],
+  '辰': ['戊', '乙', '癸'],
+  '巳': ['丙', '庚', '戊'],
+  '午': ['丁', '己'],
+  '未': ['己', '丁', '乙'],
+  '申': ['庚', '壬', '戊'],
+  '酉': ['辛'],
+  '戌': ['戊', '辛', '丁'],
+  '亥': ['壬', '甲'],
+}
+
 // ─── UI strings ───────────────────────────────────────────────────────────────
 export const UI: Record<string, Record<Language, string>> = {
   // Screens
