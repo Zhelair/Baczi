@@ -6,14 +6,22 @@
  *   2. Copy .env.example to .env.local and fill in credentials
  *
  * Run:
- *   npm run scrape
+ *   npm run scrape              — full run (local .md + web scraping)
+ *   npm run scrape -- --local   — local .md files only (no web, no DeepSeek cost)
  *
  * Sources processed (in order):
- *   1. knowledge/*.md     — your curated rules (direct, no DeepSeek cost)
- *   2. knowledge/html/*.html — local HTML files you saved from your browser
- *   3. Web: fourpillars.ru, mingli.info (DeepSeek extraction)
+ *   1. knowledge/*.md           — curated rules (direct parse, no DeepSeek cost)
+ *   2. knowledge/html/*.html    — local HTML files you saved from your browser
+ *   3. Web sources (see WEB_SOURCES below) — DeepSeek extraction
+ *      Priority school: joey_yap (fourpillars.ru)
+ *      Other schools tagged per source, stored alongside
  *
- * Each run is safe to re-run — duplicates are ignored via ON CONFLICT.
+ * Contradiction handling:
+ *   Rules from different schools coexist in the DB tagged by `school`.
+ *   The app filters by preferred school (joey_yap first) at query time.
+ *   Conflicting rules are never deleted — they stay for reference.
+ *
+ * Each run is safe to re-run — upserts on (pattern, source_url), never duplicates.
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -24,32 +32,44 @@ import { fileURLToPath } from 'url'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const ROOT = join(__dirname, '..')
 
+const LOCAL_ONLY = process.argv.includes('--local')
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// ── School assignment per source domain ───────────────────────────────────────
+// Rules extracted from a known source get this school tag automatically,
+// overriding whatever DeepSeek guesses.
+
+const SCHOOL_BY_DOMAIN = {
+  'fourpillars.ru':    'joey_yap',
+  'joeyap.com':        'joey_yap',
+  'mingli.info':       'classical',
+  'zi3.ru':            'classical',
+  'feng-shui.ru':      'classical',
+  'fatemaster.ai':     'unknown',
+  'bazi-lab.com':      'unknown',
+  'cantian.ai':        'unknown',
+}
+
+function schoolForUrl(url) {
+  try {
+    const host = new URL(url).hostname.replace('www.', '')
+    for (const [domain, school] of Object.entries(SCHOOL_BY_DOMAIN)) {
+      if (host.includes(domain)) return school
+    }
+  } catch {}
+  return 'unknown'
+}
+
 // ── .md structured parser (no DeepSeek — direct load) ────────────────────────
 
-/**
- * Parses a structured .md file into rule objects.
- *
- * Format (see knowledge/README.md for full spec):
- *
- *   ## pattern_name
- *   tags: Tag1, Tag2
- *   school: classical
- *   confidence: high
- *
- *   Rule description text.
- *
- *   ---
- */
 function parseMdRules(content, filePath) {
   const sourceUrl = `local:${basename(filePath)}`
   const rules = []
 
-  // Split on ## headings (each heading starts a new rule block)
   const blocks = content.split(/^## /m).slice(1)
 
   for (const block of blocks) {
@@ -65,8 +85,7 @@ function parseMdRules(content, filePath) {
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i]
-
-      if (line.startsWith('---')) break  // end of rule block
+      if (line.startsWith('---')) break
 
       if (!inDesc) {
         if (line.startsWith('tags:')) {
@@ -81,7 +100,6 @@ function parseMdRules(content, filePath) {
           confidence = line.replace('confidence:', '').trim()
           continue
         }
-        // blank line after metadata = start of description
         if (line.trim() === '') {
           inDesc = true
           continue
@@ -95,9 +113,9 @@ function parseMdRules(content, filePath) {
     if (!pattern || !rule_text) continue
 
     rules.push({
-      pattern: pattern.slice(0, 200),
-      rule_text: rule_text.slice(0, 1000),
-      school: school.slice(0, 50),
+      pattern:    pattern.slice(0, 200),
+      rule_text:  rule_text.slice(0, 1000),
+      school:     school.slice(0, 50),
       source_url: sourceUrl,
       confidence: ['high', 'medium', 'low'].includes(confidence) ? confidence : 'medium',
       tags,
@@ -138,8 +156,8 @@ function htmlToText(html) {
 function extractArticleLinks(html, baseUrl) {
   const links = new Set()
   const patterns = [
-    /href="(\/(?:articles?|sections?|posts?|bazi|theory|knowledge)[^"]*?)"/gi,
-    /href="(https?:\/\/(?:fourpillars\.ru|mingli\.info)\/[^"]*?)"/gi,
+    /href="(\/(?:articles?|sections?|posts?|bazi|theory|knowledge|wiki|guide|blog|ten-gods|branches|stems|school)[^"]*?)"/gi,
+    /href="(https?:\/\/(?:fourpillars\.ru|mingli\.info|zi3\.ru|feng-shui\.ru|fatemaster\.ai|bazi-lab\.com|cantian\.ai)[^"]*?)"/gi,
   ]
   for (const pattern of patterns) {
     let match
@@ -179,15 +197,22 @@ function sleep(ms) {
   return new Promise(r => setTimeout(r, ms))
 }
 
-// ── DeepSeek extraction (used for web pages and local HTML) ───────────────────
+// ── DeepSeek extraction ───────────────────────────────────────────────────────
+// schoolHint: tells DeepSeek which school this source belongs to, so extracted
+// rules get the correct school tag instead of being guessed.
 
-async function extractRules(text, sourceUrl, lang) {
+async function extractRules(text, sourceUrl, lang, schoolHint = 'unknown') {
   const trimmed = text.slice(0, 5000)
+
+  const schoolNote = schoolHint !== 'unknown'
+    ? `This source belongs to the "${schoolHint}" school. Set school="${schoolHint}" for ALL rules extracted from it.`
+    : 'Detect the school from context (classical | zi_ping | dong_gong | joey_yap | unknown).'
 
   const prompt = `You are a BaZi (Four Pillars of Destiny) expert. Extract structured BaZi rules from the article text below.
 
 Article source: ${sourceUrl}
 Language: ${lang === 'ru' ? 'Russian' : 'English'}
+School note: ${schoolNote}
 
 Article text:
 """
@@ -202,7 +227,7 @@ Respond ONLY with valid JSON:
     {
       "pattern": "short identifier using pinyin e.g. Zi_Wu_clash or strong_Jia_daymaster",
       "rule_text": "clear description of the rule in English",
-      "school": "classical",
+      "school": "${schoolHint !== 'unknown' ? schoolHint : 'classical'}",
       "confidence": "high",
       "tags": ["Zi", "Wu", "clash", "earthly_branch"]
     }
@@ -210,8 +235,9 @@ Respond ONLY with valid JSON:
 }
 
 - pattern: pinyin names (Jia Yi Bing Ding Wu Ji Geng Xin Ren Gui / Zi Chou Yin Mao Chen Si Wu Wei Shen You Xu Hai)
+- rule_text: always in English even if source is Russian
 - confidence: "high" if clearly stated, "medium" if implied, "low" if uncertain
-- school: "classical" | "dong_gong" | "joey_yap" | "zi_ping" | "unknown"
+- school: use the school note above — do not override a known school
 - If no rules found: {"rules": []}`
 
   try {
@@ -237,14 +263,17 @@ Respond ONLY with valid JSON:
     const parsed = JSON.parse(data.choices[0].message.content)
     const rules = parsed.rules ?? []
 
+    // Hard-override school for known sources — don't trust DeepSeek to get it right
+    const finalSchool = schoolHint !== 'unknown' ? schoolHint : null
+
     return rules.map(r => ({
-      pattern: String(r.pattern || '').slice(0, 200),
-      rule_text: String(r.rule_text || '').slice(0, 1000),
-      school: String(r.school || 'unknown').slice(0, 50),
+      pattern:    String(r.pattern || '').slice(0, 200),
+      rule_text:  String(r.rule_text || '').slice(0, 1000),
+      school:     finalSchool ?? String(r.school || 'unknown').slice(0, 50),
       source_url: sourceUrl,
       confidence: ['high', 'medium', 'low'].includes(r.confidence) ? r.confidence : 'medium',
-      tags: Array.isArray(r.tags) ? r.tags.map(t => String(t).slice(0, 50)) : [],
-      lang,
+      tags:       Array.isArray(r.tags) ? r.tags.map(t => String(t).slice(0, 50)) : [],
+      lang: 'en',  // rule_text is always English (DeepSeek translates)
     }))
   } catch (err) {
     console.log(`  Extraction error: ${err.message}`)
@@ -280,25 +309,44 @@ async function findFiles(dir, ext) {
   return results
 }
 
-// ── Web targets ───────────────────────────────────────────────────────────────
+// ── Web sources ───────────────────────────────────────────────────────────────
+//
+// school field here becomes the hard-override school for all rules from that source.
+// 'unknown' means DeepSeek detects it from context.
+//
+// Priority:
+//   joey_yap  — fourpillars.ru (primary school for this app)
+//   classical — mingli.info, zi3.ru, forum.feng-shui.ru
+//   unknown   — fatemaster.ai, bazi-lab.com, cantian.ai (English, mixed schools)
 
-const INDEX_PAGES = [
-  { url: 'https://fourpillars.ru/articles', lang: 'ru', discover: true },
+const WEB_SOURCES = [
+  // ── Joey Yap school (primary) ─────────────────────────────────────────────
+  { url: 'https://fourpillars.ru/articles',  lang: 'ru', school: 'joey_yap', discover: true },
   ...Array.from({ length: 9 }, (_, i) => ({
     url: `https://fourpillars.ru/sections/${i + 1}`,
-    lang: 'ru',
-    discover: true,
+    lang: 'ru', school: 'joey_yap', discover: true,
   })),
-  { url: 'https://mingli.info/articles', lang: 'ru', discover: true },
-  { url: 'https://mingli.info/bazi-theory', lang: 'ru', discover: true },
-  { url: 'https://mingli.info/theory', lang: 'ru', discover: true },
+
+  // ── Classical Russian sources ─────────────────────────────────────────────
+  { url: 'https://mingli.info/articles',     lang: 'ru', school: 'classical', discover: true },
+  { url: 'https://mingli.info/bazi-theory',  lang: 'ru', school: 'classical', discover: true },
+  { url: 'https://mingli.info/theory',       lang: 'ru', school: 'classical', discover: true },
+  { url: 'https://zi3.ru',                   lang: 'ru', school: 'classical', discover: true },
+  { url: 'https://forum.feng-shui.ru',       lang: 'ru', school: 'classical', discover: true },
+
+  // ── English sources (mixed schools, DeepSeek detects) ────────────────────
+  { url: 'https://www.fatemaster.ai',        lang: 'en', school: 'unknown',  discover: true },
+  { url: 'https://www.bazi-lab.com',         lang: 'en', school: 'unknown',  discover: true },
+  { url: 'https://cantian.ai',               lang: 'en', school: 'unknown',  discover: true },
 ]
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
   console.log('=== BaZi Knowledge Scraper ===')
-  console.log(`Time: ${new Date().toISOString()}\n`)
+  console.log(`Time: ${new Date().toISOString()}`)
+  if (LOCAL_ONLY) console.log('Mode: LOCAL ONLY (--local flag set, skipping web)\n')
+  else console.log('Mode: FULL (local + web)\n')
 
   let totalRules = 0
 
@@ -316,7 +364,13 @@ async function main() {
       totalRules += stored
     }
   } else {
-    console.log('── No .md files in knowledge/ (add some to get started) ──')
+    console.log('── No .md files in knowledge/ ──')
+  }
+
+  if (LOCAL_ONLY) {
+    console.log('\n=== Done (local only) ===')
+    console.log(`Total rules stored/updated: ${totalRules}`)
+    return
   }
 
   // ── 2. Local HTML files (DeepSeek extraction) ────────────────────────────────
@@ -330,29 +384,29 @@ async function main() {
       const html = await readFile(file, 'utf8')
       const text = htmlToText(html)
       if (text.length < 300) { console.log(`  Too short, skipping`); continue }
-      console.log(`  Extracting from ${text.length} chars...`)
-      const rules = await extractRules(text, `local:${basename(file)}`, 'en')
+      const school = schoolForUrl(`local:${basename(file)}`)
+      console.log(`  Extracting from ${text.length} chars (school: ${school})...`)
+      const rules = await extractRules(text, `local:${basename(file)}`, 'en', school)
       console.log(`  Found ${rules.length} rules`)
-      const stored = await storeRules(rules)
-      totalRules += stored
+      totalRules += await storeRules(rules)
     }
-  } else {
-    console.log('\n── No HTML files in knowledge/html/ (drop .html files there) ──')
   }
 
   // ── 3. Web scraping ──────────────────────────────────────────────────────────
   console.log('\n── Web sources ──')
   const visited = new Set()
 
-  for (const { url, lang, discover } of INDEX_PAGES) {
+  for (const { url, lang, school, discover } of WEB_SOURCES) {
     if (visited.has(url)) continue
     visited.add(url)
 
-    console.log(`\nIndex: ${url}`)
+    console.log(`\n[${school}] Index: ${url}`)
     const html = await fetchPage(url)
     if (!html) continue
 
-    totalRules += await storeRules(await extractRules(htmlToText(html), url, lang))
+    const indexRules = await extractRules(htmlToText(html), url, lang, school)
+    console.log(`  Extracted ${indexRules.length} rules from index page`)
+    totalRules += await storeRules(indexRules)
 
     if (discover) {
       const links = extractArticleLinks(html, url)
@@ -362,13 +416,13 @@ async function main() {
         if (visited.has(link)) continue
         visited.add(link)
 
-        console.log(`\n  Article: ${link}`)
+        console.log(`\n  [${school}] Article: ${link}`)
         const pageHtml = await fetchPage(link)
         if (!pageHtml) continue
         const text = htmlToText(pageHtml)
         if (text.length < 300) { console.log(`  Too short, skipping`); continue }
         console.log(`  Extracting from ${text.length} chars...`)
-        const rules = await extractRules(text, link, lang)
+        const rules = await extractRules(text, link, lang, school)
         console.log(`  Found ${rules.length} rules`)
         totalRules += await storeRules(rules)
 
