@@ -31,6 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const school  = (req.query.school as string | undefined)?.trim()
     const confidence = (req.query.confidence as string | undefined)?.trim()
     const search  = (req.query.search as string | undefined)?.trim()
+    const tag     = (req.query.tag    as string | undefined)?.trim()
     const from    = page * limit
 
     let query = supabase
@@ -41,6 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (school)     query = query.eq('school', school)
     if (confidence) query = query.eq('confidence', confidence)
+    if (tag)        query = query.contains('tags', [tag])
     if (search)     query = query.or(`pattern.ilike.%${search}%,rule_text.ilike.%${search}%`)
 
     const { data, error, count } = await query

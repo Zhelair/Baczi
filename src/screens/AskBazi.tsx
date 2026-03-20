@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Sparkles, History, Download, Trash2, FolderOpen, X, Save, Upload, Volume2, VolumeX, Mic, MicOff } from 'lucide-react'
 import { loadAuth, loadChatSessions, saveChatSessions, type ChatSession } from '../utils/storage'
-import { speak, stopSpeaking, ttsAvailable, startSTT, sttAvailable, type STTHandle } from '../utils/tts'
+import { speak, stopSpeaking, ttsAvailable, startSTT, sttAvailable, stripMarkdown, type STTHandle } from '../utils/tts'
 import type { BaziChart } from '../engine/types'
 import type { Language } from '../engine/types'
 
@@ -312,6 +312,9 @@ export default function AskBazi({ chart, lang }: Props) {
         </div>
         <p className="text-xs text-zinc-500">
           {lang === 'bg' ? '15 жетона на въпрос' : lang === 'ru' ? '15 токенов за вопрос' : '15 tokens per question'}
+          {lang === 'bg' && (
+            <span className="ml-2 text-zinc-700" title="Bulgarian TTS depends on your browser/OS. If it sounds wrong, your device may lack a Bulgarian voice.">· ⓘ гласът зависи от браузъра</span>
+          )}
         </p>
 
         {showSaveInput && (
@@ -423,7 +426,7 @@ export default function AskBazi({ chart, lang }: Props) {
                     : 'bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-bl-sm'
                 }`}
               >
-                {m.content}
+                {m.role === 'assistant' ? stripMarkdown(m.content) : m.content}
               </div>
               {/* TTS button for assistant messages */}
               {m.role === 'assistant' && ttsAvailable && (
