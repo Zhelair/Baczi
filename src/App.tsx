@@ -87,6 +87,10 @@ export default function App() {
     setState('app')
   }
 
+  function handleSkipSetup() {
+    setState('app')
+  }
+
   function handleLangChange(newLang: Language) {
     saveLang(newLang)
     setLang(newLang)
@@ -136,28 +140,48 @@ export default function App() {
   }
 
   if (state === 'setup') {
-    return <Setup lang={lang} onDone={handleSetupDone} />
+    return <Setup lang={lang} onDone={handleSetupDone} onSkip={handleSkipSetup} />
   }
 
-  if (!profile) {
-    return <Setup lang={lang} onDone={handleSetupDone} />
-  }
+  // Prompt shown when profile is not set up yet
+  const needsProfile = !profile
+  const setupPrompt = (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
+      <div className="text-5xl mb-4">✨</div>
+      <h2 className="text-xl font-semibold text-zinc-100 mb-2">
+        {lang === 'bg' ? 'Настрой профила си' : lang === 'ru' ? 'Настройте профиль' : 'Set up your profile'}
+      </h2>
+      <p className="text-zinc-500 text-sm mb-6 max-w-xs">
+        {lang === 'bg' ? 'Въведи данните си за раждане, за да получиш персонализирани четения' :
+         lang === 'ru' ? 'Введите данные о рождении, чтобы получать персонализированные трактовки' :
+         'Enter your birth data to receive personalized readings'}
+      </p>
+      <button
+        onClick={() => setState('setup')}
+        className="bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-xl px-6 py-3 transition-colors"
+      >
+        {lang === 'bg' ? '🔮 Въведи данни' : lang === 'ru' ? '🔮 Ввести данные' : '🔮 Enter data'}
+      </button>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-zinc-950">
       <div className="md:pl-52">
-        {tab === 'today'    && <Today profile={profile} lang={lang} />}
-        {tab === 'chart'    && <MyChart profile={profile} lang={lang} />}
-        {tab === 'lucky'    && <LuckyDates profile={profile} lang={lang} />}
-        {tab === 'ask'      && chart && <AskBazi chart={chart} lang={lang} />}
+        {tab === 'today'    && (needsProfile ? setupPrompt : <Today profile={profile!} lang={lang} />)}
+        {tab === 'chart'    && (needsProfile ? setupPrompt : <MyChart profile={profile!} lang={lang} />)}
+        {tab === 'lucky'    && (needsProfile ? setupPrompt : <LuckyDates profile={profile!} lang={lang} />)}
+        {tab === 'ask'      && (needsProfile ? setupPrompt : (chart && <AskBazi chart={chart} lang={lang} />))}
         {tab === 'settings' && (
-          <Settings
-            profile={profile}
-            lang={lang}
-            onLangChange={handleLangChange}
-            onThemeChange={handleThemeChange}
-            onReset={handleReset}
-          />
+          needsProfile
+            ? <Setup lang={lang} onDone={handleSetupDone} onSkip={handleSkipSetup} />
+            : <Settings
+                profile={profile!}
+                lang={lang}
+                onLangChange={handleLangChange}
+                onThemeChange={handleThemeChange}
+                onReset={handleReset}
+              />
         )}
         {tab === 'admin' && tier === 'admin' && <AdminPanel />}
       </div>

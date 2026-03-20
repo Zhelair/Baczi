@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Sparkles, History, Download, Trash2, FolderOpen, X, Save, Upload, Volume2, VolumeX, Mic } from 'lucide-react'
+import { Send, Sparkles, History, Download, Trash2, FolderOpen, X, Save, Upload, Volume2, VolumeX, Mic, MicOff } from 'lucide-react'
 import { loadAuth, loadChatSessions, saveChatSessions, type ChatSession } from '../utils/storage'
-import { speak, stopSpeaking, ttsAvailable } from '../utils/tts'
+import { speak, stopSpeaking, ttsAvailable, startSTT, sttAvailable, type STTHandle } from '../utils/tts'
 import type { BaziChart } from '../engine/types'
 import type { Language } from '../engine/types'
 
@@ -62,6 +62,8 @@ export default function AskBazi({ chart, lang }: Props) {
   const [saveName, setSaveName] = useState('')
   const [showSaveInput, setShowSaveInput] = useState(false)
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const sttRef = useRef<STTHandle | null>(null)
   const importRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -95,6 +97,30 @@ export default function AskBazi({ chart, lang }: Props) {
   function stopAll() {
     stopSpeaking()
     setSpeakingIdx(null)
+  }
+
+  function toggleRecording() {
+    if (isRecording) {
+      sttRef.current?.stop()
+      sttRef.current = null
+      setIsRecording(false)
+      return
+    }
+    setIsRecording(true)
+    sttRef.current = startSTT(
+      lang,
+      (text) => setInput(text),
+      () => { setIsRecording(false); sttRef.current = null },
+      () => { setIsRecording(false); sttRef.current = null },
+    )
+    if (!sttRef.current) setIsRecording(false)
+  }
+
+  function discardRecording() {
+    sttRef.current?.stop()
+    sttRef.current = null
+    setIsRecording(false)
+    setInput('')
   }
 
   function saveSession() {
@@ -218,7 +244,7 @@ export default function AskBazi({ chart, lang }: Props) {
   const assistantCount = messages.filter(m => m.role === 'assistant').length
 
   return (
-    <div className="flex flex-col h-screen pb-20 md:pb-0 max-w-3xl mx-auto w-full">
+    <div className="flex flex-col h-screen pb-20 md:pb-0 max-w-4xl mx-auto w-full px-0 md:px-4">
       {/* Hidden file input for import */}
       <input
         ref={importRef}
@@ -443,20 +469,55 @@ export default function AskBazi({ chart, lang }: Props) {
 
       {/* Input */}
       <div className="px-4 pb-2 flex-shrink-0">
-        <div className="flex gap-2 items-end bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-2 focus-within:border-amber-500/50 transition-colors">
+        {/* Recording indicator */}
+        {isRecording && (
+          <div className="flex items-center justify-between mb-2 px-3 py-2 rounded-xl bg-red-950/60 border border-red-700/50">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-xs text-red-300">
+                {lang === 'bg' ? 'Записва...' : lang === 'ru' ? 'Запись...' : 'Recording...'}
+              </span>
+            </div>
+            <button onClick={discardRecording} className="text-xs text-zinc-400 hover:text-red-400 transition-colors flex items-center gap-1">
+              <X size={12} />
+              {lang === 'bg' ? 'Откажи' : lang === 'ru' ? 'Отмена' : 'Discard'}
+            </button>
+          </div>
+        )}
+        <div className={`flex gap-2 items-end bg-zinc-900 border rounded-2xl px-4 py-2 transition-colors ${isRecording ? 'border-red-500/50' : 'border-zinc-800 focus-within:border-amber-500/50'}`}>
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder={PLACEHOLDER[lang]}
+            placeholder={isRecording
+              ? (lang === 'bg' ? 'Говори...' : lang === 'ru' ? 'Говорите...' : 'Speak now...')
+              : PLACEHOLDER[lang]
+            }
             rows={1}
-            disabled={loading}
+            disabled={loading || isRecording}
             className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 resize-none focus:outline-none disabled:opacity-50 max-h-28 py-1"
             style={{ fieldSizing: 'content' } as React.CSSProperties}
           />
+          {/* Mic button — STT */}
+          {sttAvailable && !loading && (
+            <button
+              onClick={toggleRecording}
+              className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-colors mb-0.5 ${
+                isRecording
+                  ? 'bg-red-500 hover:bg-red-400 animate-pulse'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200'
+              }`}
+              title={isRecording
+                ? (lang === 'bg' ? 'Спри записа' : lang === 'ru' ? 'Остановить' : 'Stop recording')
+                : (lang === 'bg' ? 'Говори' : lang === 'ru' ? 'Говорить' : 'Speak')
+              }
+            >
+              {isRecording ? <MicOff size={14} className="text-white" /> : <Mic size={14} />}
+            </button>
+          )}
           <button
             onClick={() => send()}
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || loading || isRecording}
             className="flex-shrink-0 w-8 h-8 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors mb-0.5"
           >
             <Send size={14} className="text-black" />

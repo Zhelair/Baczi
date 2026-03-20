@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Settings2, Zap, Save, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Settings2, Zap, Save, RefreshCw, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
 import { loadAuth, loadAdminToken } from '../utils/storage'
+import KnowledgeBase from './KnowledgeBase'
 
 interface AiConfig {
   model: string
@@ -14,6 +15,7 @@ interface BaziConfig {
   monthlyTokens: { free: number; pro: number; max: number; admin: number }
   knowledgeLimit: number
   confidenceLevels: string[]
+  knowledgeSchool: string   // '' = all schools, or 'joey_yap', 'classical', etc.
 }
 
 interface Config {
@@ -28,8 +30,18 @@ const DEFAULT_CONFIG: Config = {
     monthlyTokens: { free: 500, pro: 2000, max: 10000, admin: 999999 },
     knowledgeLimit: 6,
     confidenceLevels: ['high', 'medium'],
+    knowledgeSchool: '',
   },
 }
+
+const SCHOOLS = [
+  { value: '',          label: 'All schools (mixed)' },
+  { value: 'classical', label: 'Classical' },
+  { value: 'zi_ping',   label: 'Zi Ping' },
+  { value: 'dong_gong', label: 'Dong Gong' },
+  { value: 'joey_yap',  label: 'Joey Yap' },
+  { value: 'unknown',   label: 'Unknown' },
+]
 
 async function adminFetch(method: string, body?: unknown, tokenOverride?: string) {
   const token = tokenOverride ?? loadAdminToken() ?? loadAuth()?.token ?? ''
@@ -80,7 +92,10 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 const INPUT = 'w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition-colors'
 
+type PanelTab = 'config' | 'knowledge'
+
 export default function AdminPanel({ adminToken }: { adminToken?: string } = {}) {
+  const [panelTab, setPanelTab] = useState<PanelTab>('config')
   const [config, setConfig] = useState<Config>(DEFAULT_CONFIG)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<'ai' | 'bazi' | null>(null)
@@ -136,38 +151,61 @@ export default function AdminPanel({ adminToken }: { adminToken?: string } = {})
     )
   }
 
+  const isKnowledge = panelTab === 'knowledge'
+
   return (
-    <div className="pb-28 md:pb-8 px-4 pt-6 max-w-2xl mx-auto">
+    <div className="pb-28 md:pb-8 px-4 md:px-8 pt-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-zinc-100">Admin Panel</h2>
           <p className="text-xs text-zinc-500 mt-0.5">AI tuning · BaZi tuning · JSON config</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setJsonView(v => !v)}
-            className="text-xs border border-zinc-700 text-zinc-400 hover:border-zinc-500 rounded-lg px-3 py-1.5 transition-colors"
-          >
-            {jsonView ? 'Form view' : 'JSON view'}
-          </button>
-          <button
-            onClick={load}
-            className="text-xs border border-zinc-700 text-zinc-400 hover:border-zinc-500 rounded-lg px-3 py-1.5 transition-colors flex items-center gap-1"
-          >
-            <RefreshCw size={11} />
-            Reload
-          </button>
-        </div>
+        {!isKnowledge && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setJsonView(v => !v)}
+              className="text-xs border border-zinc-700 text-zinc-400 hover:border-zinc-500 rounded-lg px-3 py-1.5 transition-colors"
+            >
+              {jsonView ? 'Form view' : 'JSON view'}
+            </button>
+            <button
+              onClick={load}
+              className="text-xs border border-zinc-700 text-zinc-400 hover:border-zinc-500 rounded-lg px-3 py-1.5 transition-colors flex items-center gap-1"
+            >
+              <RefreshCw size={11} />
+              Reload
+            </button>
+          </div>
+        )}
       </div>
 
-      {error && (
+      {/* Tab bar */}
+      <div className="flex gap-1 mb-6 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
+        <button
+          onClick={() => setPanelTab('config')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${!isKnowledge ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-500 hover:text-zinc-300'}`}
+        >
+          <Settings2 size={14} /> Configuration
+        </button>
+        <button
+          onClick={() => setPanelTab('knowledge')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${isKnowledge ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-500 hover:text-zinc-300'}`}
+        >
+          <BookOpen size={14} /> Knowledge Base
+        </button>
+      </div>
+
+      {/* Knowledge Base view */}
+      {isKnowledge && <KnowledgeBase adminToken={adminToken} />}
+
+      {!isKnowledge && error && (
         <div className="mb-4 rounded-lg bg-red-950/50 border border-red-900 px-4 py-2 text-red-400 text-sm">
           {error}
         </div>
       )}
 
-      {jsonView ? (
+      {!isKnowledge && (jsonView ? (
         // ── Raw JSON view ──────────────────────────────────────────────────
         <div className="space-y-4">
           {(['ai', 'bazi'] as const).map(key => (
@@ -285,12 +323,29 @@ export default function AdminPanel({ adminToken }: { adminToken?: string } = {})
               />
             </Field>
 
-            <div className="pt-1">
+            <Field label="Active school" hint="filter knowledge by school (leave blank = all)">
+              <select
+                className={INPUT + ' cursor-pointer'}
+                value={config.bazi.knowledgeSchool ?? ''}
+                onChange={e => setBazi('knowledgeSchool', e.target.value)}
+              >
+                {SCHOOLS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </Field>
+
+            <div className="pt-1 flex items-center gap-3">
               <SaveBtn section="bazi" saving={saving} saved={saved} onSave={() => save('bazi')} />
+              <button
+                type="button"
+                onClick={() => setPanelTab('knowledge')}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm border border-zinc-700 text-zinc-400 hover:border-amber-500/50 hover:text-amber-400 transition-colors"
+              >
+                <BookOpen size={13} /> Browse Knowledge Base
+              </button>
             </div>
           </Section>
         </>
-      )}
+      ))}
     </div>
   )
 }
