@@ -1,6 +1,6 @@
 // @ts-ignore — lunar-javascript ships its own types
 import { Solar } from 'lunar-javascript'
-import { stemLabel, branchLabel } from './translations'
+import { stemLabel, branchLabel, HIDDEN_STEMS } from './translations'
 import type { BaziChart, Pillar, LuckCycle, TodayPillars, Language } from './types'
 
 function makePillar(gan: string, zhi: string, lang: Language): Pillar {
@@ -15,6 +15,7 @@ function makePillar(gan: string, zhi: string, lang: Language): Pillar {
     zhiAnimal: b.animal,
     zhiElement: b.element,
     zhiElementKey: b.elementKey,
+    hiddenStems: HIDDEN_STEMS[zhi] ?? [],
   }
 }
 

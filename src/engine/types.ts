@@ -29,6 +29,7 @@ export interface Pillar {
   zhiAnimal: string     // animal name in current language
   zhiElement: string    // element of the branch in current language
   zhiElementKey: ElementKey
+  hiddenStems: string[] // 地支藏干 — hidden stems of the earthly branch
 }
 
 export interface BaziChart {
