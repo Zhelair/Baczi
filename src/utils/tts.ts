@@ -6,24 +6,56 @@ const LANG_CODE: Record<Language, string> = {
   en: 'en-GB',
 }
 
+/** Remove markdown formatting symbols so TTS doesn't read them aloud. */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/gs, '$1')          // **bold**
+    .replace(/\*(.+?)\*/gs, '$1')               // *italic*
+    .replace(/__(.+?)__/gs, '$1')               // __bold__
+    .replace(/_(.+?)_/gs, '$1')                 // _italic_
+    .replace(/#{1,6}\s*/g, '')                  // ## headings
+    .replace(/`([^`]+)`/g, '$1')               // `code`
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')   // [link](url)
+    .replace(/[*_#`~>]/g, '')                   // any remaining symbols
+    .replace(/\s{2,}/g, ' ')                    // collapse extra spaces
+    .trim()
+}
+
 function pickVoice(lang: Language): SpeechSynthesisVoice | null {
   const voices = window.speechSynthesis.getVoices()
   const code = LANG_CODE[lang]
   const prefix = code.split('-')[0]
-  // Prefer exact lang code match, fallback to language prefix
-  return (
-    voices.find(v => v.lang === code) ??
-    voices.find(v => v.lang.startsWith(prefix)) ??
-    null
-  )
+
+  // Collect all voices matching this language (exact first, then prefix)
+  const exact   = voices.filter(v => v.lang === code)
+  const prefixed = voices.filter(v => v.lang.startsWith(prefix) && v.lang !== code)
+  const pool     = [...exact, ...prefixed]
+
+  if (lang === 'en') {
+    // Prefer known female or explicitly female-named voices
+    const female = pool.find(v =>
+      /female|woman|girl/i.test(v.name) ||
+      /\b(samantha|victoria|karen|moira|tessa|fiona|serena|alice|kate|amy|emma|joanna)\b/i.test(v.name)
+    )
+    if (female) return female
+  }
+
+  if (lang === 'bg') {
+    // Chrome on some OSes reports Bulgarian as 'bg' only — accept both
+    const bgVoice = voices.find(v => v.lang === 'bg-BG' || v.lang === 'bg')
+    if (bgVoice) return bgVoice
+  }
+
+  return pool[0] ?? null
 }
 
 export function speak(text: string, lang: Language, onEnd?: () => void) {
   if (!('speechSynthesis' in window)) return
   window.speechSynthesis.cancel()
+  const cleanText = stripMarkdown(text)
 
   function doSpeak() {
-    const utterance = new SpeechSynthesisUtterance(text)
+    const utterance = new SpeechSynthesisUtterance(cleanText)
     utterance.lang = LANG_CODE[lang]
     utterance.rate = 0.92
     utterance.pitch = 1.0
