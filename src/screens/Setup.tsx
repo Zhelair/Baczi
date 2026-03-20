@@ -6,6 +6,7 @@ import type { Language, UserProfile, Gender } from '../engine/types'
 interface Props {
   lang: Language
   onDone: () => void
+  onSkip?: () => void
 }
 
 interface NominatimResult {
@@ -23,7 +24,7 @@ interface LocationInfo {
   utcOffset: number
 }
 
-export default function Setup({ lang, onDone }: Props) {
+export default function Setup({ lang, onDone, onSkip }: Props) {
   const [name, setName] = useState('')
   const [birthDate, setBirthDate] = useState('')   // DD.MM.YYYY
   const [birthTime, setBirthTime] = useState('')   // HH:MM
@@ -284,6 +285,16 @@ export default function Setup({ lang, onDone }: Props) {
           >
             {t('calculate', lang)}
           </button>
+
+          {onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              className="w-full text-center text-sm text-zinc-600 hover:text-zinc-400 transition-colors py-2"
+            >
+              {lang === 'bg' ? 'Пропусни засега →' : lang === 'ru' ? 'Пропустить →' : 'Skip for now →'}
+            </button>
+          )}
         </form>
       </div>
     </div>

@@ -54,7 +54,7 @@ export default function LuckyDates({ profile, lang }: Props) {
   }
 
   return (
-    <div className="pb-24 md:pb-8 px-4 pt-6 max-w-2xl mx-auto">
+    <div className="pb-24 md:pb-8 px-4 md:px-8 pt-6 max-w-4xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-zinc-100">{t('lucky', lang)}</h2>
         <div className="flex items-center gap-2">

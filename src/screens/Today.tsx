@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Zap, Clock } from 'lucide-react'
+import { Zap, Clock, X } from 'lucide-react'
 import PillarCard from '../components/PillarCard'
-import StarRating from '../components/StarRating'
 import TokenBadge from '../components/TokenBadge'
 import ThinkingOrb from '../components/ThinkingOrb'
 import AiStatusBadge from '../components/AiStatusBadge'
@@ -10,7 +9,90 @@ import { t, LIFE_AREA_EMOJIS } from '../engine/translations'
 import { loadAuth, saveAuth } from '../utils/storage'
 import { loadTodayReading, saveReading } from '../utils/storage'
 import { getInterpretation } from '../utils/api'
-import type { Language, UserProfile, BaziChart, TodayPillars, DailyReading } from '../engine/types'
+import type { Language, UserProfile, BaziChart, TodayPillars, DailyReading, LifeAreaRating } from '../engine/types'
+
+// Score → color mapping: 1=red, 2=orange, 3=amber, 4=lime, 5=emerald
+function scoreColor(score: number): { bg: string; border: string; bar: string; text: string } {
+  if (score >= 5) return { bg: 'bg-emerald-950/40', border: 'border-emerald-700/50', bar: 'bg-emerald-500', text: 'text-emerald-400' }
+  if (score >= 4) return { bg: 'bg-lime-950/40',    border: 'border-lime-700/50',    bar: 'bg-lime-500',    text: 'text-lime-400'    }
+  if (score >= 3) return { bg: 'bg-amber-950/30',   border: 'border-amber-700/40',   bar: 'bg-amber-500',   text: 'text-amber-400'   }
+  if (score >= 2) return { bg: 'bg-orange-950/40',  border: 'border-orange-700/50',  bar: 'bg-orange-500',  text: 'text-orange-400'  }
+  return               { bg: 'bg-red-950/40',       border: 'border-red-700/50',     bar: 'bg-red-500',     text: 'text-red-400'     }
+}
+
+function scoreLabel(score: number, lang: Language): string {
+  const labels: Record<number, Record<Language, string>> = {
+    5: { bg: 'Отлично', ru: 'Отлично', en: 'Excellent' },
+    4: { bg: 'Добре',   ru: 'Хорошо',  en: 'Good'      },
+    3: { bg: 'Неутрал', ru: 'Нейтрал', en: 'Neutral'   },
+    2: { bg: 'Внимание',ru: 'Осторожно',en: 'Caution'  },
+    1: { bg: 'Избягвай',ru: 'Избегать', en: 'Avoid'    },
+  }
+  return labels[score]?.[lang] ?? ''
+}
+
+function LifeAreaCard({ area, lang, onClick, selected }: {
+  area: LifeAreaRating; lang: Language; onClick: () => void; selected: boolean
+}) {
+  const c = scoreColor(area.score)
+  const pct = ((area.score - 1) / 4) * 100
+  return (
+    <button
+      onClick={onClick}
+      className={`relative rounded-xl border p-3 text-center cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] w-full ${c.bg} ${c.border} ${selected ? 'ring-2 ring-offset-1 ring-offset-zinc-950 ring-amber-400' : ''}`}
+    >
+      <div className="text-2xl mb-1">{LIFE_AREA_EMOJIS[area.key] ?? '•'}</div>
+      <div className="text-xs font-medium text-zinc-200 mb-2 leading-tight">{t(area.key, lang)}</div>
+      {/* Score bar */}
+      <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${c.bar}`} style={{ width: `${pct}%` }} />
+      </div>
+      <div className={`text-xs mt-1 font-medium ${c.text}`}>{scoreLabel(area.score, lang)}</div>
+    </button>
+  )
+}
+
+function LifeAreasDashboard({ areas, lang, selectedArea, setSelectedArea }: {
+  areas: LifeAreaRating[]
+  lang: Language
+  selectedArea: string | null
+  setSelectedArea: (key: string | null) => void
+}) {
+  const active = selectedArea ? areas.find(a => a.key === selectedArea) : null
+  const c = active ? scoreColor(active.score) : null
+  return (
+    <section className="mb-6">
+      <h3 className="text-xs uppercase tracking-wider text-zinc-500 mb-3">
+        {lang === 'bg' ? 'Области на живота' : lang === 'ru' ? 'Сферы жизни' : 'Life Areas'}
+      </h3>
+      <div className="grid grid-cols-4 gap-2">
+        {areas.map(area => (
+          <LifeAreaCard
+            key={area.key}
+            area={area}
+            lang={lang}
+            selected={selectedArea === area.key}
+            onClick={() => setSelectedArea(selectedArea === area.key ? null : area.key)}
+          />
+        ))}
+      </div>
+      {active && c && (
+        <div className={`mt-2 rounded-xl border p-4 ${c.bg} ${c.border}`}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">{LIFE_AREA_EMOJIS[active.key] ?? '•'}</span>
+              <span className={`text-sm font-semibold ${c.text}`}>{t(active.key, lang)}</span>
+            </div>
+            <button onClick={() => setSelectedArea(null)} className="text-zinc-500 hover:text-zinc-300 transition-colors flex-shrink-0">
+              <X size={14} />
+            </button>
+          </div>
+          <p className="text-sm text-zinc-200 mt-2 leading-relaxed">{active.tip}</p>
+        </div>
+      )}
+    </section>
+  )
+}
 
 interface Props {
   profile: UserProfile
@@ -29,6 +111,7 @@ export default function Today({ profile, lang }: Props) {
   const [reading, setReading] = useState<DailyReading | null>(() => loadTodayReading())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [selectedArea, setSelectedArea] = useState<string | null>(null)
   const auth = loadAuth()
 
   useEffect(() => {
@@ -69,7 +152,7 @@ export default function Today({ profile, lang }: Props) {
   )
 
   return (
-    <div className="pb-24 md:pb-8 px-4 pt-6 max-w-2xl mx-auto">
+    <div className="pb-24 md:pb-8 px-4 md:px-8 pt-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-1">
@@ -125,26 +208,8 @@ export default function Today({ profile, lang }: Props) {
             <p className="text-zinc-200 text-sm leading-relaxed">{reading.interpretation}</p>
           </section>
 
-          {/* Life areas */}
-          <section className="mb-6">
-            <h3 className="text-xs uppercase tracking-wider text-zinc-500 mb-3">
-              {lang === 'bg' ? 'Области на живота' : lang === 'ru' ? 'Сферы жизни' : 'Life Areas'}
-            </h3>
-            <div className="space-y-2">
-              {reading.lifeAreas?.map(area => (
-                <div key={area.key} className="flex items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-3">
-                  <span className="text-xl">{LIFE_AREA_EMOJIS[area.key] ?? '•'}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-zinc-200">{t(area.key, lang)}</span>
-                      <StarRating score={area.score} />
-                    </div>
-                    <p className="text-xs text-zinc-400">{area.tip}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          {/* Life areas dashboard */}
+          <LifeAreasDashboard areas={reading.lifeAreas ?? []} lang={lang} selectedArea={selectedArea} setSelectedArea={setSelectedArea} />
 
           {/* Lucky hours */}
           {reading.luckyHours?.length > 0 && (
