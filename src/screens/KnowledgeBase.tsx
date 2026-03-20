@@ -9,7 +9,7 @@ interface KnowledgeRule {
   school: string
   confidence: string
   tags: string[]
-  source?: string
+  source_url?: string
 }
 
 interface PageResult {
@@ -81,7 +81,7 @@ function AddRuleModal({ onSave, onClose }: { onSave: (rule: Omit<KnowledgeRule, 
         school,
         confidence,
         tags: tags.split(',').map(s => s.trim()).filter(Boolean),
-        source: 'admin',
+        source_url: 'admin',
       })
       onClose()
     } catch (e) {
@@ -207,8 +207,8 @@ function RuleRow({ rule, onDelete }: { rule: KnowledgeRule; onDelete: (id: numbe
               ))}
             </div>
           )}
-          {rule.source && (
-            <p className="text-xs text-zinc-600">Source: {rule.source}</p>
+          {rule.source_url && (
+            <p className="text-xs text-zinc-600">Source: {rule.source_url}</p>
           )}
         </div>
       )}
