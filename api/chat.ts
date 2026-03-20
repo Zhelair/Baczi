@@ -63,15 +63,34 @@ async function fetchKnowledge(chart: Record<string, unknown>): Promise<string> {
   }
   if (!tags.size) return ''
 
-  const { data } = await supabase
-    .from('bazi_knowledge')
-    .select('rule_text, school')
-    .overlaps('tags', [...tags])
-    .in('confidence', ['high', 'medium'])
-    .limit(6)
+  const tagArr = [...tags]
 
-  if (!data?.length) return ''
-  return 'Relevant classical rules:\n' + data.map(r => `• ${r.rule_text}`).join('\n')
+  // Prefer joey_yap (fourpillars.ru) school first, top 4 rules
+  const { data: primary } = await supabase
+    .from('bazi_knowledge')
+    .select('rule_text')
+    .overlaps('tags', tagArr)
+    .eq('school', 'joey_yap')
+    .in('confidence', ['high', 'medium'])
+    .limit(4)
+
+  // Fill remaining slots from any school (excluding already found patterns)
+  const needed = 6 - (primary?.length ?? 0)
+  let extra: { rule_text: string }[] = []
+  if (needed > 0) {
+    const { data } = await supabase
+      .from('bazi_knowledge')
+      .select('rule_text')
+      .overlaps('tags', tagArr)
+      .neq('school', 'joey_yap')
+      .in('confidence', ['high', 'medium'])
+      .limit(needed)
+    extra = data ?? []
+  }
+
+  const all = [...(primary ?? []), ...extra]
+  if (!all.length) return ''
+  return 'Relevant BaZi rules (Joey Yap school):\n' + all.map(r => `• ${r.rule_text}`).join('\n')
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

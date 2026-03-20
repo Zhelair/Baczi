@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { LogOut, Trash2, ShieldAlert } from 'lucide-react'
+import { LogOut, Trash2, ShieldAlert, Download } from 'lucide-react'
 import { t } from '../engine/translations'
-import { clearAll, loadAuth, saveAdminToken, loadAdminToken, clearAdminToken } from '../utils/storage'
+import { clearAll, loadAuth, saveAdminToken, loadAdminToken, clearAdminToken, loadChatSessions, loadTodayReading } from '../utils/storage'
 import TokenBadge from '../components/TokenBadge'
 import AdminPanel from './AdminPanel'
 import type { Language, Theme, UserProfile } from '../engine/types'
@@ -33,6 +33,22 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
   const [adminPhrase, setAdminPhrase] = useState('')
   const [adminError, setAdminError] = useState('')
   const [adminLoading, setAdminLoading] = useState(false)
+
+  function handleExportData() {
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      profile,
+      chatSessions: loadChatSessions(),
+      todayReading: loadTodayReading(),
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `bazi-export-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   function handleClearData() {
     if (window.confirm(t('clearConfirm', lang))) {
@@ -220,6 +236,25 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
           )}
         </section>
       )}
+
+      {/* Export data */}
+      <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+        <p className="text-xs uppercase tracking-wider text-zinc-500 mb-3">
+          {lang === 'bg' ? 'Моите данни' : lang === 'ru' ? 'Мои данные' : 'My Data'}
+        </p>
+        <p className="text-xs text-zinc-500 mb-3">
+          {lang === 'bg' ? 'Изтегли профила си, чат историята и четенията като JSON.' :
+           lang === 'ru' ? 'Скачать профиль, историю чатов и чтения в формате JSON.' :
+           'Download your profile, chat history and readings as JSON.'}
+        </p>
+        <button
+          onClick={handleExportData}
+          className="flex items-center gap-2 text-sm text-zinc-300 border border-zinc-700 hover:border-zinc-500 rounded-lg px-4 py-2 transition-colors"
+        >
+          <Download size={14} />
+          {lang === 'bg' ? 'Изтегли JSON' : lang === 'ru' ? 'Скачать JSON' : 'Download JSON'}
+        </button>
+      </section>
 
       {/* Danger zone */}
       <section className="space-y-3">

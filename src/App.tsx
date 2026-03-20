@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import TokenBadge from './components/TokenBadge'
 import Passphrase from './screens/Passphrase'
 import Setup from './screens/Setup'
 import LangSelect from './screens/LangSelect'
@@ -165,8 +166,16 @@ export default function App() {
     </div>
   )
 
+  const auth = loadAuth()
+
   return (
     <div className="min-h-screen bg-zinc-950">
+      {/* Global token badge — fixed top-right, visible on all pages */}
+      {auth && tab !== 'today' && (
+        <div className="fixed top-3 right-4 z-50">
+          <TokenBadge balance={auth.balance} tier={auth.tier} resetDate={auth.resetDate} lang={lang} />
+        </div>
+      )}
       <div className="md:pl-52">
         {tab === 'today'    && (needsProfile ? setupPrompt : <Today profile={profile!} lang={lang} />)}
         {tab === 'chart'    && (needsProfile ? setupPrompt : <MyChart profile={profile!} lang={lang} />)}
