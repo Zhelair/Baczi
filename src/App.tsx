@@ -22,7 +22,7 @@ import type { Language, Theme, Tier, UserProfile } from './engine/types'
 type AppState = 'lang' | 'passphrase' | 'setup' | 'admin' | 'app'
 
 function applyTheme(theme: Theme | undefined) {
-  const t = theme ?? 'dark'
+  const t = theme ?? 'daylight'
   document.documentElement.setAttribute('data-theme', t)
 }
 
@@ -118,7 +118,7 @@ export default function App() {
     clearAll()
     setProfile(null)
     setLang('bg')
-    applyTheme('dark')
+    applyTheme('daylight')
     setState('passphrase')
   }
 
