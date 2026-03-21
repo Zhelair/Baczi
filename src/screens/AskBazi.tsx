@@ -624,7 +624,7 @@ export default function AskBazi({ chart, lang, studyContext, onNavigateToNotes }
             </button>
           </div>
         )}
-        <div className={`flex gap-2 items-end bg-zinc-900 border rounded-2xl px-4 py-2 transition-colors ${isRecording ? 'border-red-500/50' : 'border-zinc-800 focus-within:border-amber-500/50'}`}>
+        <div className={`flex gap-2 items-end border rounded-2xl px-4 py-2 transition-colors ${isRecording ? 'border-red-500/60' : 'border-[var(--card-border)] focus-within:border-amber-500/50'}`} style={{ background: 'var(--card-bg)', boxShadow: 'var(--card-shadow)' }}>
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
@@ -658,7 +658,7 @@ export default function AskBazi({ chart, lang, studyContext, onNavigateToNotes }
           <button
             onClick={() => send()}
             disabled={!input.trim() || loading || isRecording}
-            className="flex-shrink-0 w-8 h-8 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors mb-0.5"
+            className="bz-btn bz-btn-primary flex-shrink-0 w-9 h-9 rounded-xl p-0 mb-0.5"
           >
             <Send size={14} className="text-black" />
           </button>

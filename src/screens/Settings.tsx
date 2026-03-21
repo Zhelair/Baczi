@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { LogOut, Trash2, ShieldAlert, Download, Upload } from 'lucide-react'
 import { t } from '../engine/translations'
-import { clearAll, loadAuth, saveAdminToken, loadAdminToken, clearAdminToken, loadChatSessions, saveChatSessions, loadTodayReading, saveReading, saveProfile } from '../utils/storage'
+import { clearAll, loadAuth, saveAdminToken, loadAdminToken, clearAdminToken, exportProject, importProject, type BaziProject } from '../utils/storage'
 import TokenBadge from '../components/TokenBadge'
 import AdminPanel from './AdminPanel'
 import type { Language, Theme, UserProfile } from '../engine/types'
@@ -42,19 +42,17 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
-        const data = JSON.parse(ev.target?.result as string)
-        if (data.profile) saveProfile(data.profile)
-        if (Array.isArray(data.chatSessions)) saveChatSessions(data.chatSessions)
-        if (data.todayReading) saveReading(data.todayReading)
+        const data = JSON.parse(ev.target?.result as string) as BaziProject
+        importProject(data)
         setImportMsg(
-          lang === 'bg' ? 'Данните са импортирани. Презареди страницата.' :
-          lang === 'ru' ? 'Данные импортированы. Перезагрузите страницу.' :
-          'Data imported. Reload the page to apply.'
+          lang === 'bg' ? '✓ Проектът е импортиран. Презареди страницата.' :
+          lang === 'ru' ? '✓ Проект импортирован. Перезагрузите страницу.' :
+          '✓ Project imported. Reload the page to apply.'
         )
       } catch {
         setImportMsg(
-          lang === 'bg' ? 'Грешен JSON файл.' :
-          lang === 'ru' ? 'Неверный JSON файл.' : 'Invalid JSON file.'
+          lang === 'bg' ? 'Грешен файл.' :
+          lang === 'ru' ? 'Неверный файл.' : 'Invalid file.'
         )
       }
     }
@@ -63,17 +61,12 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
   }
 
   function handleExportData() {
-    const exportData = {
-      exportedAt: new Date().toISOString(),
-      profile,
-      chatSessions: loadChatSessions(),
-      todayReading: loadTodayReading(),
-    }
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const project = exportProject(profile)
+    const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
-    a.download = `bazi-export-${new Date().toISOString().split('T')[0]}.json`
+    a.download = `bazi-project-${profile.name.toLowerCase().replace(/\s+/g,'-')}-${new Date().toISOString().split('T')[0]}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -117,11 +110,11 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
   }
 
   return (
-    <div className="pb-24 md:pb-8 px-4 md:px-8 pt-6 max-w-4xl mx-auto">
-      <h2 className="text-lg font-semibold text-zinc-100 mb-6">{t('settings', lang)}</h2>
+    <div className="bz-page">
+      <h2 className="text-xl font-bold text-zinc-100 mb-7">{t('settings', lang)}</h2>
 
       {/* Profile info */}
-      <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+      <section className="mb-6 bz-card p-4 space-y-3">
         <div className="flex justify-between items-center">
           <span className="text-zinc-400 text-sm">
             {lang === 'bg' ? 'Имe' : lang === 'ru' ? 'Имя' : 'Name'}
@@ -162,8 +155,8 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
 
       {/* Token balance */}
       {auth && (
-        <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-          <p className="text-xs uppercase tracking-wider text-zinc-500 mb-3">{t('tokensLeft', lang)}</p>
+        <section className="mb-6 bz-card p-4">
+          <p className="bz-label mb-3">{t('tokensLeft', lang)}</p>
           <TokenBadge balance={auth.balance} tier={auth.tier} resetDate={auth.resetDate} lang={lang} />
           <div className="mt-2">
             <span className="text-xs text-zinc-500">{t('tier', lang)}: </span>
@@ -174,7 +167,7 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
 
       {/* Theme */}
       <section className="mb-6">
-        <p className="text-xs uppercase tracking-wider text-zinc-500 mb-3">
+        <p className="bz-label mb-3">
           {lang === 'bg' ? 'Тема' : lang === 'ru' ? 'Тема' : 'Theme'}
         </p>
         <div className="grid grid-cols-3 gap-2">
@@ -182,14 +175,15 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
             <button
               key={value}
               onClick={() => onThemeChange(value)}
-              className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border transition-colors ${
+              className={`flex flex-col items-center gap-2 py-3.5 px-2 rounded-xl border transition-all ${
                 currentTheme === value
-                  ? 'border-amber-500 bg-amber-500/10 text-amber-400'
-                  : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                  ? 'border-amber-500/60 text-amber-400'
+                  : 'border-[var(--card-border)] text-zinc-400 hover:border-amber-500/30 hover:text-zinc-200'
               }`}
+              style={currentTheme === value ? { background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-amber-500) 12%, transparent), color-mix(in srgb, var(--color-amber-500) 6%, transparent))', boxShadow: 'var(--card-shadow)' } : { background: 'var(--card-bg)' }}
             >
-              <span className="text-xl">{emoji}</span>
-              <span className="text-xs font-medium">{label[lang]}</span>
+              <span className="text-2xl">{emoji}</span>
+              <span className="text-xs font-semibold">{label[lang]}</span>
             </button>
           ))}
         </div>
@@ -197,17 +191,18 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
 
       {/* Language */}
       <section className="mb-6">
-        <p className="text-xs uppercase tracking-wider text-zinc-500 mb-3">{t('language', lang)}</p>
+        <p className="bz-label mb-3">{t('language', lang)}</p>
         <div className="space-y-2">
           {LANGS.map(({ value, label }) => (
             <button
               key={value}
               onClick={() => onLangChange(value)}
-              className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
+              className={`w-full text-left px-4 py-3 rounded-xl border transition-all text-sm font-medium ${
                 lang === value
-                  ? 'border-amber-500 bg-amber-500/10 text-amber-400'
-                  : 'border-zinc-700 text-zinc-300 hover:border-zinc-500'
+                  ? 'border-amber-500/60 text-amber-400'
+                  : 'border-[var(--card-border)] text-zinc-300 hover:border-amber-500/30 hover:text-zinc-100'
               }`}
+              style={lang === value ? { background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-amber-500) 12%, transparent), color-mix(in srgb, var(--color-amber-500) 6%, transparent))' } : { background: 'var(--card-bg)' }}
             >
               {label}
             </button>
@@ -231,10 +226,10 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
           <AdminPanel adminToken={adminToken} />
         </section>
       ) : (
-        <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+        <section className="mb-6 bz-card p-4">
           <div className="flex items-center gap-2 mb-3">
             <ShieldAlert size={14} className="text-zinc-600" />
-            <p className="text-xs uppercase tracking-wider text-zinc-500">
+            <p className="bz-label">
               {lang === 'bg' ? 'Администраторски достъп' :
                lang === 'ru' ? 'Доступ администратора' : 'Admin Access'}
             </p>
@@ -266,29 +261,29 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
       )}
 
       {/* Export data */}
-      <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-        <p className="text-xs uppercase tracking-wider text-zinc-500 mb-3">
+      <section className="mb-6 bz-card p-4">
+        <p className="bz-label mb-2">
           {lang === 'bg' ? 'Моите данни' : lang === 'ru' ? 'Мои данные' : 'My Data'}
         </p>
-        <p className="text-xs text-zinc-500 mb-3">
-          {lang === 'bg' ? 'Изтегли профила си, чат историята и четенията като JSON.' :
-           lang === 'ru' ? 'Скачать профиль, историю чатов и чтения в формате JSON.' :
-           'Download your profile, chat history and readings as JSON.'}
+        <p className="text-xs text-zinc-500 mb-4">
+          {lang === 'bg' ? 'Запазва профил, история, бележки и чат сесии. Работи между устройства и в инкогнито.' :
+           lang === 'ru' ? 'Сохраняет профиль, историю, заметки и чаты. Работает между устройствами и в режиме инкогнито.' :
+           'Saves profile, history, notes and chats. Works across devices and incognito.'}
         </p>
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={handleExportData}
-            className="flex items-center gap-2 text-sm text-zinc-300 border border-zinc-700 hover:border-zinc-500 rounded-lg px-4 py-2 transition-colors"
+            className="bz-btn bz-btn-primary"
           >
             <Download size={14} />
-            {lang === 'bg' ? 'Изтегли JSON' : lang === 'ru' ? 'Скачать JSON' : 'Download JSON'}
+            {lang === 'bg' ? 'Изтегли проекта' : lang === 'ru' ? 'Скачать проект' : 'Download Project'}
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 text-sm text-zinc-300 border border-zinc-700 hover:border-zinc-500 rounded-lg px-4 py-2 transition-colors"
+            className="bz-btn bz-btn-ghost"
           >
             <Upload size={14} />
-            {lang === 'bg' ? 'Импортирай JSON' : lang === 'ru' ? 'Импорт JSON' : 'Import JSON'}
+            {lang === 'bg' ? '↑ Импортирай проект' : lang === 'ru' ? '↑ Импорт проекта' : '↑ Import Project'}
           </button>
           <input
             ref={fileInputRef}
@@ -307,14 +302,14 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
       <section className="space-y-3">
         <button
           onClick={() => { clearAll(); onReset() }}
-          className="w-full flex items-center justify-center gap-2 border border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200 rounded-xl py-3 text-sm transition-colors"
+          className="bz-btn bz-btn-ghost w-full py-3"
         >
           <LogOut size={14} />
           {lang === 'bg' ? 'Излез' : lang === 'ru' ? 'Выйти' : 'Sign out'}
         </button>
         <button
           onClick={handleClearData}
-          className="w-full flex items-center justify-center gap-2 border border-red-900 text-red-500 hover:bg-red-950/30 rounded-xl py-3 text-sm transition-colors"
+          className="bz-btn bz-btn-danger w-full py-3"
         >
           <Trash2 size={14} />
           {t('clearData', lang)}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Zap, Clock, X } from 'lucide-react'
 import PillarCard from '../components/PillarCard'
 import TokenBadge from '../components/TokenBadge'
@@ -113,13 +113,7 @@ export default function Today({ profile, lang }: Props) {
   const [selectedArea, setSelectedArea] = useState<string | null>(null)
   const auth = loadAuth()
 
-  useEffect(() => {
-    // Auto-load if no cached reading
-    if (!reading && !loading) {
-      handleGetReading()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // No auto-fetch — user explicitly requests the reading via the button below
 
   async function handleGetReading() {
     setError('')
@@ -158,26 +152,30 @@ export default function Today({ profile, lang }: Props) {
   )
 
   return (
-    <div className="pb-24 md:pb-8 px-4 md:px-8 pt-6 max-w-4xl mx-auto">
+    <div className="bz-page">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-lg font-semibold text-zinc-100">
-            {profile.name} · {t('today', lang)}
-          </h2>
-          <div className="flex items-center gap-2">
+      <div className="mb-7">
+        <div className="flex items-start justify-between gap-3 mb-1">
+          <div>
+            <h2 className="text-xl font-bold text-zinc-100 tracking-tight">
+              <span className="bz-accent">{profile.name}</span>
+              <span className="text-zinc-500 font-normal mx-2">·</span>
+              {t('today', lang)}
+            </h2>
+            <p className="text-zinc-500 text-sm mt-0.5 capitalize">{dateStr}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 mt-0.5">
             <AiStatusBadge loading={loading} lang={lang} />
             {auth && (
               <TokenBadge balance={auth.balance} tier={auth.tier} resetDate={auth.resetDate} lang={lang} />
             )}
           </div>
         </div>
-        <p className="text-zinc-500 text-sm capitalize">{dateStr}</p>
       </div>
 
       {/* Today's universal pillars */}
-      <section className="mb-6">
-        <h3 className="text-xs uppercase tracking-wider text-zinc-500 mb-3">{t('todayEnergy', lang)}</h3>
+      <section className="mb-5">
+        <p className="bz-label mb-3">{t('todayEnergy', lang)}</p>
         <div className="grid grid-cols-3 gap-3">
           <PillarCard label={t('dayPillar', lang)}   pillar={todayPillars.day}   compact />
           <PillarCard label={t('monthPillar', lang)} pillar={todayPillars.month} compact />
@@ -186,21 +184,23 @@ export default function Today({ profile, lang }: Props) {
       </section>
 
       {/* Personal day master */}
-      <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-        <p className="text-xs uppercase tracking-wider text-zinc-500 mb-2">{t('dayMaster', lang)}</p>
-        <p className="text-zinc-100">
-          <span className={`chinese text-2xl element-${chart.dayMaster.elementKey} mr-2`}>{chart.dayMaster.gan}</span>
-          {chart.dayMaster.element} {chart.dayMaster.polarity}
-        </p>
+      <section className="mb-5 bz-card p-4 flex items-center gap-4">
+        <div>
+          <p className="bz-label mb-1">{t('dayMaster', lang)}</p>
+          <div className="flex items-center gap-3">
+            <span className={`chinese text-3xl element-${chart.dayMaster.elementKey} leading-none`}>{chart.dayMaster.gan}</span>
+            <span className="text-zinc-300 text-sm font-medium">{chart.dayMaster.element} {chart.dayMaster.polarity}</span>
+          </div>
+        </div>
       </section>
 
       {/* Reading area */}
       {loading && <ThinkingOrb lang={lang} />}
 
       {error && (
-        <div className="rounded-xl border border-red-900 bg-red-950/30 p-4 mb-4">
+        <div className="bz-card border-red-900/50 bg-red-950/20 p-4 mb-5">
           <p className="text-red-400 text-sm">{error}</p>
-          <button onClick={handleGetReading} className="text-amber-400 text-sm mt-2 underline">
+          <button onClick={handleGetReading} className="text-amber-400 text-sm mt-2 hover:underline">
             {t('enter', lang)} →
           </button>
         </div>
@@ -209,8 +209,8 @@ export default function Today({ profile, lang }: Props) {
       {reading && !loading && (
         <>
           {/* Interpretation */}
-          <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-            <h3 className="text-xs uppercase tracking-wider text-zinc-500 mb-3">{t('yourReading', lang)}</h3>
+          <section className="mb-5 bz-card p-5">
+            <p className="bz-label mb-3">{t('yourReading', lang)}</p>
             <p className="text-zinc-200 text-sm leading-relaxed">{reading.interpretation}</p>
           </section>
 
@@ -219,14 +219,14 @@ export default function Today({ profile, lang }: Props) {
 
           {/* Lucky hours */}
           {reading.luckyHours?.length > 0 && (
-            <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+            <section className="mb-5 bz-card p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Clock size={14} className="text-amber-400" />
-                <h3 className="text-xs uppercase tracking-wider text-zinc-500">{t('luckyHours', lang)}</h3>
+                <p className="bz-label">{t('luckyHours', lang)}</p>
               </div>
               <div className="flex gap-2 flex-wrap">
                 {reading.luckyHours.map(h => (
-                  <span key={h} className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm rounded-lg px-3 py-1">
+                  <span key={h} className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm rounded-lg px-3 py-1 font-medium">
                     {h}
                   </span>
                 ))}
@@ -236,15 +236,16 @@ export default function Today({ profile, lang }: Props) {
         </>
       )}
 
-      {/* Refresh button */}
+      {/* CTA button */}
       {!loading && (
         <button
           onClick={handleGetReading}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-2 border border-zinc-700 hover:border-amber-500/50 text-zinc-400 hover:text-amber-400 rounded-xl py-3 text-sm transition-colors"
+          className="bz-btn bz-btn-primary w-full py-3 text-sm mt-1"
         >
-          <Zap size={14} />
+          <Zap size={15} />
           {reading ? t('quickLuck', lang) : t('getReading', lang)}
+          {!reading && <span className="opacity-60 text-xs ml-1">(50 {lang === 'bg' ? 'жетона' : lang === 'ru' ? 'жетонов' : 'tokens'})</span>}
         </button>
       )}
 

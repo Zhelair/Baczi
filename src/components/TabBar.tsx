@@ -1,8 +1,8 @@
-import { Sun, BookOpen, Calendar, Settings, ShieldAlert, MessageCircle, Zap, Compass, Hexagon, GraduationCap, Clock, ChevronLeft, ChevronRight, Lock } from 'lucide-react'
+import { Sun, BookOpen, Calendar, Settings, ShieldAlert, MessageCircle, Zap, Compass, Hexagon, GraduationCap, Clock, Users, ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import { t } from '../engine/translations'
 import type { Language, Tier } from '../engine/types'
 
-export type Tab = 'today' | 'chart' | 'lucky' | 'ask' | 'activations' | 'fengshui' | 'qmdj' | 'learn' | 'history' | 'settings' | 'admin'
+export type Tab = 'today' | 'chart' | 'lucky' | 'ask' | 'activations' | 'fengshui' | 'qmdj' | 'learn' | 'history' | 'persons' | 'settings' | 'admin'
 
 interface Props {
   active: Tab
@@ -24,12 +24,13 @@ const BASE_TABS: { id: Tab; icon: typeof Sun; labelKey: string }[] = [
   { id: 'ask',         icon: MessageCircle,  labelKey: 'ask'         },
   { id: 'learn',       icon: GraduationCap,  labelKey: 'learn'       },
   { id: 'history',     icon: Clock,          labelKey: 'history'     },
+  { id: 'persons',     icon: Users,          labelKey: 'persons'     },
   { id: 'lucky',       icon: Calendar,       labelKey: 'lucky'       },
   { id: 'settings',    icon: Settings,       labelKey: 'settings'    },
 ]
 
 // On mobile, show only the most important tabs (sidebar handles the rest)
-const MOBILE_TABS: Tab[] = ['today', 'chart', 'ask', 'learn', 'history', 'settings']
+const MOBILE_TABS: Tab[] = ['today', 'chart', 'ask', 'learn', 'persons', 'settings']
 
 export default function TabBar({ active, onSelect, lang, tier, collapsed, onToggleCollapse }: Props) {
   const isFreeTier = !tier || tier === 'free'
@@ -73,27 +74,32 @@ export default function TabBar({ active, onSelect, lang, tier, collapsed, onTogg
 
       {/* ── Desktop: collapsible left sidebar ── */}
       <nav
-        className={`hidden md:flex fixed left-0 top-0 bottom-0 flex-col py-5 z-50 border-r transition-all duration-300 ${collapsed ? 'w-16 px-2' : 'w-52 px-3'}`}
+        className={`hidden md:flex fixed left-0 top-0 bottom-0 flex-col py-4 z-50 border-r transition-all duration-300 ${collapsed ? 'w-16 px-2' : 'w-52 px-3'}`}
         style={{ background: 'var(--nav-bg)', borderColor: 'var(--nav-border)' }}
       >
         {/* Brand */}
-        <div className={`mb-5 overflow-hidden ${collapsed ? 'px-1' : 'px-2'}`}>
+        <div className={`mb-5 overflow-hidden ${collapsed ? 'flex justify-center px-0' : 'px-2'}`}>
           {collapsed ? (
-            <div className="flex items-center justify-center">
-              <span className="text-amber-400 text-lg">☯</span>
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--color-amber-500), #ff8c00)', boxShadow: '0 2px 8px color-mix(in srgb, var(--color-amber-500) 40%, transparent)' }}>
+              <span className="text-black text-sm font-bold">☯</span>
             </div>
           ) : (
-            <div>
-              <span className="text-amber-400 text-lg font-bold tracking-tight">☯ BaZi</span>
-              <p className="text-zinc-500 text-[11px] mt-0.5 leading-tight">
-                {lang === 'bg' ? 'Китайска астрология' : lang === 'ru' ? 'Китайская астрология' : 'Chinese astrology'}
-              </p>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, var(--color-amber-500), #ff8c00)', boxShadow: '0 2px 8px color-mix(in srgb, var(--color-amber-500) 35%, transparent)' }}>
+                <span className="text-black text-sm font-bold">☯</span>
+              </div>
+              <div>
+                <p className="text-zinc-100 text-sm font-bold tracking-tight leading-tight">BaZi</p>
+                <p className="text-zinc-500 text-[10px] leading-tight">
+                  {lang === 'bg' ? 'Китайска астрология' : lang === 'ru' ? 'Китайская астрология' : 'Chinese astrology'}
+                </p>
+              </div>
             </div>
           )}
         </div>
 
         {/* Nav items */}
-        <div className="flex flex-col gap-0.5 flex-1 overflow-y-auto">
+        <div className="flex flex-col gap-0.5 flex-1 overflow-y-auto scrollbar-none">
           {tabs.map(({ id, icon: Icon, labelKey }) => {
             const isPaid = PAID_TABS.includes(id)
             const locked = isPaid && isFreeTier
@@ -111,20 +117,21 @@ export default function TabBar({ active, onSelect, lang, tier, collapsed, onTogg
                   isActive
                     ? isAdmin
                       ? 'bg-red-950/40 text-red-400 border border-red-900/50'
-                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border border-transparent'
+                      : 'border border-amber-500/20 text-amber-400'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 border border-transparent'
                 }`}
+                style={isActive && !isAdmin ? { background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-amber-500) 12%, transparent), color-mix(in srgb, var(--color-amber-500) 6%, transparent))' } : undefined}
               >
                 <div className="relative flex-shrink-0">
-                  <Icon size={18} />
+                  <Icon size={17} />
                   {locked && (
-                    <Lock size={9} className="absolute -top-1 -right-1.5 text-zinc-500" />
+                    <Lock size={8} className="absolute -top-1 -right-1.5 text-zinc-600" />
                   )}
                 </div>
                 {!collapsed && <span className="truncate">{t(labelKey, lang)}</span>}
                 {/* Tooltip when collapsed */}
                 {collapsed && (
-                  <div className="absolute left-full ml-2 px-2 py-1 bg-zinc-800 text-zinc-200 text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-10 border border-zinc-700">
+                  <div className="absolute left-full ml-2.5 px-2.5 py-1.5 text-zinc-200 text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-10 border" style={{ background: 'var(--card-bg)', borderColor: 'var(--card-border)', boxShadow: 'var(--card-shadow-lg)' }}>
                     {t(labelKey, lang)}
                   </div>
                 )}
@@ -133,19 +140,22 @@ export default function TabBar({ active, onSelect, lang, tier, collapsed, onTogg
           })}
         </div>
 
+        {/* Divider */}
+        <div className="h-px mx-1 mb-2" style={{ background: 'var(--nav-border)' }} />
+
         {/* Collapse toggle */}
         <button
           onClick={onToggleCollapse}
-          className={`mt-4 flex items-center rounded-xl py-2 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 transition-colors border border-transparent ${
+          className={`flex items-center rounded-xl py-2 text-zinc-500 hover:text-zinc-300 transition-colors ${
             collapsed ? 'justify-center px-0' : 'gap-2 px-3'
           }`}
           title={collapsed
             ? (lang === 'bg' ? 'Разшири' : lang === 'ru' ? 'Развернуть' : 'Expand')
             : (lang === 'bg' ? 'Свий' : lang === 'ru' ? 'Свернуть' : 'Collapse')}
         >
-          {collapsed ? <ChevronRight size={16} /> : (
+          {collapsed ? <ChevronRight size={15} /> : (
             <>
-              <ChevronLeft size={16} />
+              <ChevronLeft size={15} />
               <span className="text-xs">{lang === 'bg' ? 'Свий' : lang === 'ru' ? 'Свернуть' : 'Collapse'}</span>
             </>
           )}

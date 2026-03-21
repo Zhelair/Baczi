@@ -13,11 +13,12 @@ import FengShui from './screens/FengShui'
 import Qmdj from './screens/Qmdj'
 import Learning from './screens/Learning'
 import History from './screens/History'
+import Persons from './screens/Persons'
 import AdminPanel from './screens/AdminPanel'
 import AdminDashboard from './screens/AdminDashboard'
 import LockedFeature from './components/LockedFeature'
 import TabBar, { type Tab } from './components/TabBar'
-import { loadAuth, loadProfile, saveProfile, saveLang, loadLang, clearAll, loadSidebarCollapsed, saveSidebarCollapsed } from './utils/storage'
+import { loadAuth, loadProfile, saveProfile, saveLang, loadLang, clearAll, loadSidebarCollapsed, saveSidebarCollapsed, loadPersons, type PersonProfile } from './utils/storage'
 import { useDailyReminder } from './utils/dailyReminder'
 import { calculateChart } from './engine/baziCalculator'
 import type { Language, Theme, Tier, UserProfile } from './engine/types'
@@ -40,19 +41,42 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() => loadLang() ?? loadProfile()?.language ?? 'bg')
   const [tab, setTab] = useState<Tab>('today')
   const [collapsed, setCollapsed] = useState(() => loadSidebarCollapsed())
+  const [activePersonId, setActivePersonId] = useState<string | null>(null)
   const tier = loadAuth()?.tier as Tier | undefined
 
+  // When viewing someone else's chart, use their data as effectiveProfile
+  const activePerson: PersonProfile | null = activePersonId
+    ? loadPersons().find(p => p.id === activePersonId) ?? null
+    : null
+  const effectiveProfile: UserProfile | null = activePerson
+    ? {
+        name: activePerson.name,
+        birthYear: activePerson.birthYear,
+        birthMonth: activePerson.birthMonth,
+        birthDay: activePerson.birthDay,
+        birthHour: activePerson.birthHour,
+        birthMinute: activePerson.birthMinute,
+        gender: activePerson.gender,
+        birthCity: activePerson.birthCity,
+        birthLongitude: activePerson.birthLongitude,
+        birthLatitude: activePerson.birthLatitude,
+        birthUtcOffset: activePerson.birthUtcOffset,
+        language: lang,
+        theme: profile?.theme ?? 'dark',
+      }
+    : profile
+
   const chart = useMemo(() => {
-    if (!profile) return null
+    if (!effectiveProfile) return null
     try {
       return calculateChart(
-        profile.birthYear, profile.birthMonth, profile.birthDay,
-        profile.birthHour ?? null, profile.birthMinute ?? null,
-        profile.gender, lang,
-        profile.birthLongitude, profile.birthUtcOffset
+        effectiveProfile.birthYear, effectiveProfile.birthMonth, effectiveProfile.birthDay,
+        effectiveProfile.birthHour ?? null, effectiveProfile.birthMinute ?? null,
+        effectiveProfile.gender, lang,
+        effectiveProfile.birthLongitude, effectiveProfile.birthUtcOffset
       )
     } catch { return null }
-  }, [profile, lang])
+  }, [effectiveProfile, lang])
 
   useEffect(() => { applyTheme(profile?.theme) }, [profile?.theme])
 
@@ -136,7 +160,7 @@ export default function App() {
   }
   if (state === 'setup') return <Setup lang={lang} onDone={handleSetupDone} onSkip={handleSkipSetup} />
 
-  const needsProfile = !profile
+  const needsProfile = !effectiveProfile
   const setupPrompt = (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
       <div className="text-5xl mb-4">✨</div>
@@ -171,17 +195,32 @@ export default function App() {
       )}
 
       <div className={`${sidebarWidth} transition-all duration-300`}>
-        {tab === 'today'       && (needsProfile ? setupPrompt : <Today profile={profile!} lang={lang} />)}
-        {tab === 'chart'       && (needsProfile ? setupPrompt : <MyChart profile={profile!} lang={lang} />)}
+        {/* Active person banner */}
+        {activePerson && tab !== 'persons' && tab !== 'settings' && (
+          <div className="sticky top-0 z-40 flex items-center justify-between px-4 py-2 bg-amber-500/10 border-b border-amber-500/20">
+            <span className="text-xs text-amber-400">
+              {lang === 'bg' ? `Гледаш: ${activePerson.name}` : lang === 'ru' ? `Просмотр: ${activePerson.name}` : `Viewing: ${activePerson.name}`}
+            </span>
+            <button
+              onClick={() => setActivePersonId(null)}
+              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              {lang === 'bg' ? '← Назад към моя' : lang === 'ru' ? '← Назад к своему' : '← Back to mine'}
+            </button>
+          </div>
+        )}
+
+        {tab === 'today'       && (needsProfile ? setupPrompt : <Today profile={effectiveProfile!} lang={lang} />)}
+        {tab === 'chart'       && (needsProfile ? setupPrompt : <MyChart profile={effectiveProfile!} lang={lang} />)}
         {tab === 'activations' && (
           !isPaidTier
             ? <LockedFeature feature="activations" lang={lang} onUpgrade={handleUpgrade} />
-            : needsProfile ? setupPrompt : <Activations profile={profile!} lang={lang} />
+            : needsProfile ? setupPrompt : <Activations profile={effectiveProfile!} lang={lang} />
         )}
         {tab === 'fengshui'    && (
           !isPaidTier
             ? <LockedFeature feature="fengshui" lang={lang} onUpgrade={handleUpgrade} />
-            : needsProfile ? setupPrompt : <FengShui profile={profile!} lang={lang} />
+            : needsProfile ? setupPrompt : <FengShui profile={effectiveProfile!} lang={lang} />
         )}
         {tab === 'qmdj'        && (
           !isPaidTier
@@ -202,7 +241,16 @@ export default function App() {
           />
         )}
         {tab === 'history'     && <History lang={lang} />}
-        {tab === 'lucky'       && (needsProfile ? setupPrompt : <LuckyDates profile={profile!} lang={lang} />)}
+        {tab === 'persons'     && profile && (
+          <Persons
+            ownProfile={profile}
+            lang={lang}
+            activePersonId={activePersonId}
+            onActivate={(id) => { setActivePersonId(id); if (id) setTab('today') }}
+            onViewTab={(t) => setTab(t)}
+          />
+        )}
+        {tab === 'lucky'       && (needsProfile ? setupPrompt : <LuckyDates profile={effectiveProfile!} lang={lang} />)}
         {tab === 'settings'    && (
           needsProfile
             ? <Setup lang={lang} onDone={handleSetupDone} onSkip={handleSkipSetup} />
