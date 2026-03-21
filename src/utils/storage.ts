@@ -1,4 +1,4 @@
-import type { UserProfile, AuthState, DailyReading } from '../engine/types'
+import type { UserProfile, AuthState, DailyReading, Gender } from '../engine/types'
 
 export interface ChatSession {
   id: string
@@ -28,6 +28,36 @@ export interface HistoryEntry {
   data: unknown       // full serialized payload
 }
 
+// ─── Person profiles ─────────────────────────────────────────────────────────
+export interface PersonProfile {
+  id: string
+  name: string
+  birthYear: number
+  birthMonth: number
+  birthDay: number
+  birthHour: number | null
+  birthMinute: number | null
+  gender: Gender
+  birthCity?: string
+  birthLongitude?: number
+  birthLatitude?: number
+  birthUtcOffset?: number
+  note?: string
+  addedAt: string     // ISO date
+}
+
+// Full project export/import format
+export interface BaziProject {
+  version: '1'
+  type: 'bazi_project'
+  exportedAt: string
+  profile: UserProfile
+  history: HistoryEntry[]
+  notes: LearningNote[]
+  chatSessions: ChatSession[]
+  topicProgress: Record<string, TopicStatus>
+}
+
 const HISTORY_MAX = 100  // max entries total
 
 const KEYS = {
@@ -42,6 +72,7 @@ const KEYS = {
   NOTES:             'baczi_notes',
   TOPIC_PROGRESS:    'baczi_topic_progress',
   SIDEBAR_COLLAPSED: 'baczi_sidebar_collapsed',
+  PERSONS:           'baczi_persons',
 } as const
 
 export function saveAuth(auth: AuthState) {
@@ -188,6 +219,54 @@ export function deleteHistoryEntry(id: string) {
 export function clearHistoryByTool(tool: HistoryTool) {
   const updated = loadHistory().filter(e => e.tool !== tool)
   localStorage.setItem(KEYS.HISTORY, JSON.stringify(updated))
+}
+
+// ─── Persons ──────────────────────────────────────────────────────────────────
+export function loadPersons(): PersonProfile[] {
+  try { return JSON.parse(localStorage.getItem(KEYS.PERSONS) ?? '[]') as PersonProfile[] }
+  catch { return [] }
+}
+
+export function savePersons(persons: PersonProfile[]) {
+  localStorage.setItem(KEYS.PERSONS, JSON.stringify(persons))
+}
+
+export function addPerson(person: Omit<PersonProfile, 'id' | 'addedAt'>): PersonProfile {
+  const full: PersonProfile = { ...person, id: `person_${Date.now()}`, addedAt: new Date().toISOString().split('T')[0] }
+  savePersons([full, ...loadPersons()])
+  return full
+}
+
+export function deletePerson(id: string) {
+  savePersons(loadPersons().filter(p => p.id !== id))
+}
+
+// ─── Full project export/import ───────────────────────────────────────────────
+export function exportProject(profile: UserProfile): BaziProject {
+  return {
+    version: '1',
+    type: 'bazi_project',
+    exportedAt: new Date().toISOString(),
+    profile,
+    history: loadHistory(),
+    notes: loadNotes(),
+    chatSessions: loadChatSessions(),
+    topicProgress: loadTopicProgress(),
+  }
+}
+
+export function importProject(project: BaziProject) {
+  if (project.profile) saveProfile(project.profile)
+  if (Array.isArray(project.chatSessions)) saveChatSessions(project.chatSessions)
+  if (Array.isArray(project.notes)) saveNotes(project.notes)
+  if (project.topicProgress) saveTopicProgress(project.topicProgress)
+  if (Array.isArray(project.history)) {
+    // Merge: keep existing + add new (dedupe by id)
+    const existing = loadHistory()
+    const existingIds = new Set(existing.map(e => e.id))
+    const merged = [...project.history.filter(e => !existingIds.has(e.id)), ...existing].slice(0, HISTORY_MAX)
+    localStorage.setItem(KEYS.HISTORY, JSON.stringify(merged))
+  }
 }
 
 export function clearAll() {

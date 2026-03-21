@@ -1,8 +1,8 @@
-import { Sun, BookOpen, Calendar, Settings, ShieldAlert, MessageCircle, Zap, Compass, Hexagon, GraduationCap, Clock, ChevronLeft, ChevronRight, Lock } from 'lucide-react'
+import { Sun, BookOpen, Calendar, Settings, ShieldAlert, MessageCircle, Zap, Compass, Hexagon, GraduationCap, Clock, Users, ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import { t } from '../engine/translations'
 import type { Language, Tier } from '../engine/types'
 
-export type Tab = 'today' | 'chart' | 'lucky' | 'ask' | 'activations' | 'fengshui' | 'qmdj' | 'learn' | 'history' | 'settings' | 'admin'
+export type Tab = 'today' | 'chart' | 'lucky' | 'ask' | 'activations' | 'fengshui' | 'qmdj' | 'learn' | 'history' | 'persons' | 'settings' | 'admin'
 
 interface Props {
   active: Tab
@@ -24,12 +24,13 @@ const BASE_TABS: { id: Tab; icon: typeof Sun; labelKey: string }[] = [
   { id: 'ask',         icon: MessageCircle,  labelKey: 'ask'         },
   { id: 'learn',       icon: GraduationCap,  labelKey: 'learn'       },
   { id: 'history',     icon: Clock,          labelKey: 'history'     },
+  { id: 'persons',     icon: Users,          labelKey: 'persons'     },
   { id: 'lucky',       icon: Calendar,       labelKey: 'lucky'       },
   { id: 'settings',    icon: Settings,       labelKey: 'settings'    },
 ]
 
 // On mobile, show only the most important tabs (sidebar handles the rest)
-const MOBILE_TABS: Tab[] = ['today', 'chart', 'ask', 'learn', 'history', 'settings']
+const MOBILE_TABS: Tab[] = ['today', 'chart', 'ask', 'learn', 'persons', 'settings']
 
 export default function TabBar({ active, onSelect, lang, tier, collapsed, onToggleCollapse }: Props) {
   const isFreeTier = !tier || tier === 'free'

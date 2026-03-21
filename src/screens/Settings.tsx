@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { LogOut, Trash2, ShieldAlert, Download, Upload } from 'lucide-react'
 import { t } from '../engine/translations'
-import { clearAll, loadAuth, saveAdminToken, loadAdminToken, clearAdminToken, loadChatSessions, saveChatSessions, loadTodayReading, saveReading, saveProfile } from '../utils/storage'
+import { clearAll, loadAuth, saveAdminToken, loadAdminToken, clearAdminToken, exportProject, importProject, type BaziProject } from '../utils/storage'
 import TokenBadge from '../components/TokenBadge'
 import AdminPanel from './AdminPanel'
 import type { Language, Theme, UserProfile } from '../engine/types'
@@ -42,19 +42,17 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
-        const data = JSON.parse(ev.target?.result as string)
-        if (data.profile) saveProfile(data.profile)
-        if (Array.isArray(data.chatSessions)) saveChatSessions(data.chatSessions)
-        if (data.todayReading) saveReading(data.todayReading)
+        const data = JSON.parse(ev.target?.result as string) as BaziProject
+        importProject(data)
         setImportMsg(
-          lang === 'bg' ? 'Данните са импортирани. Презареди страницата.' :
-          lang === 'ru' ? 'Данные импортированы. Перезагрузите страницу.' :
-          'Data imported. Reload the page to apply.'
+          lang === 'bg' ? '✓ Проектът е импортиран. Презареди страницата.' :
+          lang === 'ru' ? '✓ Проект импортирован. Перезагрузите страницу.' :
+          '✓ Project imported. Reload the page to apply.'
         )
       } catch {
         setImportMsg(
-          lang === 'bg' ? 'Грешен JSON файл.' :
-          lang === 'ru' ? 'Неверный JSON файл.' : 'Invalid JSON file.'
+          lang === 'bg' ? 'Грешен файл.' :
+          lang === 'ru' ? 'Неверный файл.' : 'Invalid file.'
         )
       }
     }
@@ -63,17 +61,12 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
   }
 
   function handleExportData() {
-    const exportData = {
-      exportedAt: new Date().toISOString(),
-      profile,
-      chatSessions: loadChatSessions(),
-      todayReading: loadTodayReading(),
-    }
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+    const project = exportProject(profile)
+    const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
-    a.download = `bazi-export-${new Date().toISOString().split('T')[0]}.json`
+    a.download = `bazi-project-${profile.name.toLowerCase().replace(/\s+/g,'-')}-${new Date().toISOString().split('T')[0]}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -271,24 +264,24 @@ export default function Settings({ profile, lang, onLangChange, onThemeChange, o
           {lang === 'bg' ? 'Моите данни' : lang === 'ru' ? 'Мои данные' : 'My Data'}
         </p>
         <p className="text-xs text-zinc-500 mb-3">
-          {lang === 'bg' ? 'Изтегли профила си, чат историята и четенията като JSON.' :
-           lang === 'ru' ? 'Скачать профиль, историю чатов и чтения в формате JSON.' :
-           'Download your profile, chat history and readings as JSON.'}
+          {lang === 'bg' ? 'Запазва профил, история, бележки и чат сесии. Работи между устройства и в инкогнито.' :
+           lang === 'ru' ? 'Сохраняет профиль, историю, заметки и чаты. Работает между устройствами и в режиме инкогнито.' :
+           'Saves profile, history, notes and chats. Works across devices and incognito.'}
         </p>
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={handleExportData}
-            className="flex items-center gap-2 text-sm text-zinc-300 border border-zinc-700 hover:border-zinc-500 rounded-lg px-4 py-2 transition-colors"
+            className="flex items-center gap-2 text-sm font-medium text-zinc-200 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 rounded-lg px-4 py-2 transition-colors"
           >
-            <Download size={14} />
-            {lang === 'bg' ? 'Изтегли JSON' : lang === 'ru' ? 'Скачать JSON' : 'Download JSON'}
+            <Download size={14} className="text-amber-400" />
+            {lang === 'bg' ? '↓ Изтегли проекта' : lang === 'ru' ? '↓ Скачать проект' : '↓ Download Project'}
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-2 text-sm text-zinc-300 border border-zinc-700 hover:border-zinc-500 rounded-lg px-4 py-2 transition-colors"
           >
             <Upload size={14} />
-            {lang === 'bg' ? 'Импортирай JSON' : lang === 'ru' ? 'Импорт JSON' : 'Import JSON'}
+            {lang === 'bg' ? '↑ Импортирай проект' : lang === 'ru' ? '↑ Импорт проекта' : '↑ Import Project'}
           </button>
           <input
             ref={fileInputRef}
