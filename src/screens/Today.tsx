@@ -241,6 +241,15 @@ export default function Today({ profile, lang }: Props) {
           {reading ? t('quickLuck', lang) : t('getReading', lang)}
         </button>
       )}
+
+      {/* Methodology note */}
+      <p className="text-center text-xs text-zinc-600 mt-6">
+        {lang === 'ru'
+          ? 'Интерпретации основаны на методологии БаЦзы Джои Яп'
+          : lang === 'bg'
+          ? 'Интерпретациите са базирани на методологията на Джоуи Яп за БаЦзъ'
+          : 'Interpretations follow Joey Yap\'s BaZi methodology'}
+      </p>
     </div>
   )
 }

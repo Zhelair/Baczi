@@ -15,7 +15,6 @@ interface BaziConfig {
   monthlyTokens: { free: number; pro: number; max: number; admin: number }
   knowledgeLimit: number
   confidenceLevels: string[]
-  knowledgeSchool: string   // '' = all schools, or 'joey_yap', 'classical', etc.
 }
 
 interface Config {
@@ -30,18 +29,8 @@ const DEFAULT_CONFIG: Config = {
     monthlyTokens: { free: 500, pro: 2000, max: 10000, admin: 999999 },
     knowledgeLimit: 6,
     confidenceLevels: ['high', 'medium'],
-    knowledgeSchool: '',
   },
 }
-
-const SCHOOLS = [
-  { value: '',          label: 'All schools (mixed)' },
-  { value: 'classical', label: 'Classical' },
-  { value: 'zi_ping',   label: 'Zi Ping' },
-  { value: 'dong_gong', label: 'Dong Gong' },
-  { value: 'joey_yap',  label: 'Joey Yap' },
-  { value: 'unknown',   label: 'Unknown' },
-]
 
 async function adminFetch(method: string, body?: unknown, tokenOverride?: string) {
   const token = tokenOverride ?? loadAdminToken() ?? loadAuth()?.token ?? ''
@@ -321,16 +310,6 @@ export default function AdminPanel({ adminToken }: { adminToken?: string } = {})
                   e.target.value.split(',').map(s => s.trim()).filter(Boolean)
                 )}
               />
-            </Field>
-
-            <Field label="Active school" hint="filter knowledge by school (leave blank = all)">
-              <select
-                className={INPUT + ' cursor-pointer'}
-                value={config.bazi.knowledgeSchool ?? ''}
-                onChange={e => setBazi('knowledgeSchool', e.target.value)}
-              >
-                {SCHOOLS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
             </Field>
 
             <div className="pt-1 flex items-center gap-3">
