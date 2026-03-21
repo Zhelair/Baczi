@@ -1,8 +1,8 @@
-import { Sun, BookOpen, Calendar, Settings, ShieldAlert, MessageCircle, Zap } from 'lucide-react'
+import { Sun, BookOpen, Calendar, Settings, ShieldAlert, MessageCircle, Zap, Compass } from 'lucide-react'
 import { t } from '../engine/translations'
 import type { Language, Tier } from '../engine/types'
 
-export type Tab = 'today' | 'chart' | 'lucky' | 'ask' | 'activations' | 'settings' | 'admin'
+export type Tab = 'today' | 'chart' | 'lucky' | 'ask' | 'activations' | 'fengshui' | 'settings' | 'admin'
 
 interface Props {
   active: Tab
@@ -15,6 +15,7 @@ const BASE_TABS: { id: Tab; icon: typeof Sun; labelKey: string }[] = [
   { id: 'today',       icon: Sun,           labelKey: 'today'       },
   { id: 'chart',       icon: BookOpen,      labelKey: 'chart'       },
   { id: 'activations', icon: Zap,           labelKey: 'activations' },
+  { id: 'fengshui',    icon: Compass,       labelKey: 'fengshui'    },
   { id: 'ask',         icon: MessageCircle, labelKey: 'ask'         },
   { id: 'lucky',       icon: Calendar,      labelKey: 'lucky'       },
   { id: 'settings',    icon: Settings,      labelKey: 'settings'    },
