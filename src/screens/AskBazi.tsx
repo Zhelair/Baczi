@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Sparkles, History, Download, Trash2, FolderOpen, X, Save, Upload, Volume2, VolumeX, Mic, MicOff } from 'lucide-react'
-import { loadAuth, loadChatSessions, saveChatSessions, type ChatSession } from '../utils/storage'
+import { Send, Sparkles, History, Download, Trash2, FolderOpen, X, Save, Upload, Volume2, VolumeX, Mic, MicOff, BookmarkPlus, Check } from 'lucide-react'
+import { loadAuth, loadChatSessions, saveChatSessions, loadNotes, saveNotes, type ChatSession, type LearningNote } from '../utils/storage'
 import { speak, stopSpeaking, ttsAvailable, startSTT, sttAvailable, stripMarkdown, type STTHandle } from '../utils/tts'
+import { LEARNING_TOPICS } from '../data/learningTopics'
+import { t } from '../engine/translations'
 import type { BaziChart } from '../engine/types'
 import type { Language } from '../engine/types'
 
@@ -10,9 +12,18 @@ interface Message {
   content: string
 }
 
+export interface StudyContext {
+  topicId: string
+  topicTitle: string
+  mode: 'study' | 'quiz'
+  prompt: string
+}
+
 interface Props {
   chart: BaziChart
   lang: Language
+  studyContext?: StudyContext | null
+  onNavigateToNotes?: () => void
 }
 
 const STARTERS: Record<Language, string[]> = {
@@ -52,7 +63,7 @@ function downloadJson(data: unknown, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-export default function AskBazi({ chart, lang }: Props) {
+export default function AskBazi({ chart, lang, studyContext, onNavigateToNotes }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -63,9 +74,15 @@ export default function AskBazi({ chart, lang }: Props) {
   const [showSaveInput, setShowSaveInput] = useState(false)
   const [speakingIdx, setSpeakingIdx] = useState<number | null>(null)
   const [isRecording, setIsRecording] = useState(false)
+  // Save to Notes state
+  const [saveNoteFor, setSaveNoteFor] = useState<number | null>(null)  // message index
+  const [saveNoteTopic, setSaveNoteTopic] = useState('general')
+  const [saveNoteContent, setSaveNoteContent] = useState('')
+  const [savedNoteIdx, setSavedNoteIdx] = useState<number | null>(null) // flash confirmation
   const sttRef = useRef<STTHandle | null>(null)
   const importRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const studySentRef = useRef(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -73,6 +90,16 @@ export default function AskBazi({ chart, lang }: Props) {
 
   // Stop TTS when unmounting
   useEffect(() => () => stopSpeaking(), [])
+
+  // Auto-send study/quiz prompt when coming from Learning screen
+  useEffect(() => {
+    if (studyContext && !studySentRef.current) {
+      studySentRef.current = true
+      setMessages([])
+      send(studyContext.prompt)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studyContext])
 
   function speakMessage(idx: number, text: string) {
     if (speakingIdx === idx) {
@@ -136,6 +163,30 @@ export default function AskBazi({ chart, lang }: Props) {
     setSessions(updated)
     setSaveName('')
     setShowSaveInput(false)
+  }
+
+  function openSaveNote(idx: number, content: string) {
+    setSaveNoteFor(idx)
+    setSaveNoteContent(stripMarkdown(content))
+    setSaveNoteTopic(studyContext?.topicId ?? 'general')
+  }
+
+  function confirmSaveNote() {
+    if (!saveNoteContent.trim()) return
+    const topic = LEARNING_TOPICS.find(t => t.id === saveNoteTopic)
+    const note: LearningNote = {
+      id: Date.now().toString(),
+      topicId: saveNoteTopic,
+      topicTitle: topic ? topic.title[lang] : (lang === 'bg' ? 'Общо' : lang === 'ru' ? 'Общее' : 'General'),
+      content: saveNoteContent.trim(),
+      date: new Date().toISOString().split('T')[0],
+    }
+    const updated = [note, ...loadNotes()]
+    saveNotes(updated)
+    setSavedNoteIdx(saveNoteFor)
+    setSaveNoteFor(null)
+    setSaveNoteContent('')
+    setTimeout(() => setSavedNoteIdx(null), 2500)
   }
 
   function deleteSession(id: string) {
@@ -259,9 +310,20 @@ export default function AskBazi({ chart, lang }: Props) {
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <Sparkles size={16} className="text-amber-400" />
-            <h2 className="text-lg font-semibold text-zinc-100">
-              {lang === 'bg' ? 'Попитай картата' : lang === 'ru' ? 'Спроси карту' : 'Ask your chart'}
-            </h2>
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-100">
+                {studyContext
+                  ? studyContext.topicTitle
+                  : (lang === 'bg' ? 'Попитай картата' : lang === 'ru' ? 'Спроси карту' : 'Ask your chart')}
+              </h2>
+              {studyContext && (
+                <p className="text-xs text-amber-500">
+                  {studyContext.mode === 'study'
+                    ? (lang === 'bg' ? '📖 Режим учене' : lang === 'ru' ? '📖 Режим учёбы' : '📖 Study mode')
+                    : (lang === 'bg' ? '🎯 Режим тест' : lang === 'ru' ? '🎯 Режим теста' : '🎯 Quiz mode')}
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-1">
             {/* Read all / stop */}
@@ -428,21 +490,82 @@ export default function AskBazi({ chart, lang }: Props) {
               >
                 {m.role === 'assistant' ? stripMarkdown(m.content) : m.content}
               </div>
-              {/* TTS button for assistant messages */}
-              {m.role === 'assistant' && ttsAvailable && (
-                <button
-                  onClick={() => speakMessage(i, m.content)}
-                  className={`self-start flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs transition-colors ${
-                    speakingIdx === i
-                      ? 'text-amber-400 bg-amber-500/10'
-                      : 'text-zinc-600 hover:text-zinc-400'
-                  }`}
-                >
-                  {speakingIdx === i ? <VolumeX size={11} /> : <Volume2 size={11} />}
-                  {speakingIdx === i
-                    ? (lang === 'bg' ? 'спри' : lang === 'ru' ? 'стоп' : 'stop')
-                    : (lang === 'bg' ? 'прочети' : lang === 'ru' ? 'читать' : 'listen')}
-                </button>
+              {/* Action buttons for assistant messages */}
+              {m.role === 'assistant' && (
+                <div className="self-start flex items-center gap-2 flex-wrap">
+                  {ttsAvailable && (
+                    <button
+                      onClick={() => speakMessage(i, m.content)}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs transition-colors ${
+                        speakingIdx === i
+                          ? 'text-amber-400 bg-amber-500/10'
+                          : 'text-zinc-600 hover:text-zinc-400'
+                      }`}
+                    >
+                      {speakingIdx === i ? <VolumeX size={11} /> : <Volume2 size={11} />}
+                      {speakingIdx === i
+                        ? (lang === 'bg' ? 'спри' : lang === 'ru' ? 'стоп' : 'stop')
+                        : (lang === 'bg' ? 'прочети' : lang === 'ru' ? 'читать' : 'listen')}
+                    </button>
+                  )}
+                  {savedNoteIdx === i ? (
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs text-emerald-400">
+                      <Check size={11} /> {t('noteSaved', lang)}
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => openSaveNote(i, m.content)}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs text-zinc-600 hover:text-amber-400 transition-colors"
+                    >
+                      <BookmarkPlus size={11} />
+                      {t('saveToNotes', lang)}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Save to Notes panel */}
+              {m.role === 'assistant' && saveNoteFor === i && (
+                <div className="mt-2 rounded-xl border border-zinc-700 bg-zinc-900 p-3 w-full max-w-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-zinc-300">{t('saveNoteTitle', lang)}</span>
+                    <button onClick={() => setSaveNoteFor(null)} className="text-zinc-600 hover:text-zinc-400">
+                      <X size={12} />
+                    </button>
+                  </div>
+                  <select
+                    value={saveNoteTopic}
+                    onChange={e => setSaveNoteTopic(e.target.value)}
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-200 mb-2 focus:outline-none focus:border-amber-500 transition-colors"
+                  >
+                    <option value="general">{t('saveNoteGeneral', lang)}</option>
+                    {LEARNING_TOPICS.map(topic => (
+                      <option key={topic.id} value={topic.id}>{topic.title[lang]}</option>
+                    ))}
+                  </select>
+                  <textarea
+                    value={saveNoteContent}
+                    onChange={e => setSaveNoteContent(e.target.value)}
+                    rows={3}
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-200 resize-none focus:outline-none focus:border-amber-500 transition-colors mb-2"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={confirmSaveNote}
+                      className="flex-1 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold transition-colors"
+                    >
+                      {lang === 'bg' ? 'Запази' : lang === 'ru' ? 'Сохранить' : 'Save'}
+                    </button>
+                    {onNavigateToNotes && (
+                      <button
+                        onClick={() => { confirmSaveNote(); onNavigateToNotes() }}
+                        className="px-3 py-1.5 rounded-lg border border-zinc-600 text-zinc-400 hover:text-zinc-200 text-xs transition-colors"
+                      >
+                        {lang === 'bg' ? 'Виж бележките' : lang === 'ru' ? 'К заметкам' : 'View Notes'}
+                      </button>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </div>

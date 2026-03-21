@@ -7,11 +7,20 @@
   --color-earth: #fbbf24;
   --color-metal: #94a3b8;
   --color-water: #60a5fa;
+
+  /* ─── Card & surface system (daylight defaults) ─── */
+  --page-bg:        #f5f0e8;
+  --card-bg:        #fffdf9;
+  --card-border:    #e8e0d4;
+  --card-shadow:    0 1px 3px rgba(100,70,40,0.07), 0 1px 2px rgba(100,70,40,0.04);
+  --card-shadow-lg: 0 4px 16px rgba(100,70,40,0.10), 0 2px 6px rgba(100,70,40,0.06);
+  --nav-bg:         #ede8df;
+  --nav-border:     #d8cfc2;
 }
 
 /* ─── Base body (daylight is the default) ───────────────────────────────────── */
 body {
-  background-color: #f5f0e8;
+  background-color: var(--page-bg);
   color: #1c1714;
   font-family: system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -36,6 +45,16 @@ body {
 [data-theme="dark"] body {
   background-color: #0a0a0a;
   color: #f4f4f5;
+}
+
+[data-theme="dark"] {
+  --page-bg:        #0a0a0a;
+  --card-bg:        #18181b;
+  --card-border:    #27272a;
+  --card-shadow:    0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --card-shadow-lg: 0 4px 16px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35);
+  --nav-bg:         #09090b;
+  --nav-border:     #27272a;
 }
 
 /* ─── DAYLIGHT THEME ────────────────────────────────────────────────────────── */
@@ -89,6 +108,16 @@ body {
 [data-theme="neon"] body {
   background-color: #03030f;
   color: #f0ecff;
+}
+
+[data-theme="neon"] {
+  --page-bg:        #03030f;
+  --card-bg:        #0d0b20;
+  --card-border:    #2d2569;
+  --card-shadow:    0 0 0 1px rgba(192,38,211,0.08), 0 2px 8px rgba(0,0,0,0.5);
+  --card-shadow-lg: 0 0 0 1px rgba(192,38,211,0.18), 0 4px 20px rgba(192,38,211,0.12), 0 2px 8px rgba(0,0,0,0.4);
+  --nav-bg:         #07050f;
+  --nav-border:     #1a1640;
 }
 
 /* ─── Element color classes ─────────────────────────────────────────────────── */
@@ -196,4 +225,34 @@ body {
   font-size: 12px;
   color: var(--color-zinc-500, #71717a);
   margin-top: 2px;
+}
+
+/* ─── Card utility system ───────────────────────────────────────────────────── */
+.bz-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  border-radius: 14px;
+}
+
+.bz-card-hover:hover {
+  box-shadow: var(--card-shadow-lg);
+}
+
+/* ─── Daylight: explicit overrides for zinc Tailwind classes ─────────────────── */
+/* Sections and cards that use bg-zinc-900 should read as warm cream */
+[data-theme="daylight"] .bg-zinc-900 {
+  background-color: var(--card-bg) !important;
+}
+[data-theme="daylight"] .border-zinc-800 {
+  border-color: var(--card-border) !important;
+}
+[data-theme="daylight"] .bg-zinc-950 {
+  background-color: var(--page-bg) !important;
+}
+
+/* ─── Sidebar transition ────────────────────────────────────────────────────── */
+nav.transition-all {
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
