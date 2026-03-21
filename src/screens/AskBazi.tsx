@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Sparkles, History, Download, Trash2, FolderOpen, X, Save, Upload, Volume2, VolumeX, Mic, MicOff, BookmarkPlus, Check } from 'lucide-react'
-import { loadAuth, loadChatSessions, saveChatSessions, loadNotes, saveNotes, type ChatSession, type LearningNote } from '../utils/storage'
+import { loadAuth, saveAuth as _saveAuth, loadChatSessions, saveChatSessions, loadNotes, saveNotes, addHistoryEntry, updateHistoryEntry, type ChatSession, type LearningNote } from '../utils/storage'
 import { speak, stopSpeaking, ttsAvailable, startSTT, sttAvailable, stripMarkdown, type STTHandle } from '../utils/tts'
 import { LEARNING_TOPICS } from '../data/learningTopics'
 import { t } from '../engine/translations'
@@ -83,6 +83,7 @@ export default function AskBazi({ chart, lang, studyContext, onNavigateToNotes }
   const importRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const studySentRef = useRef(false)
+  const historyIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -95,6 +96,7 @@ export default function AskBazi({ chart, lang, studyContext, onNavigateToNotes }
   useEffect(() => {
     if (studyContext && !studySentRef.current) {
       studySentRef.current = true
+      historyIdRef.current = null
       setMessages([])
       send(studyContext.prompt)
     }
@@ -267,15 +269,27 @@ export default function AskBazi({ chart, lang, studyContext, onNavigateToNotes }
         return
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply! }])
+      const reply = data.reply!
+      const updatedMessages = [...newMessages, { role: 'assistant' as const, content: reply }]
+      setMessages(updatedMessages)
 
       if (data.balance !== undefined) {
         const stored = loadAuth()
-        if (stored) {
-          const { saveAuth } = await import('../utils/storage')
-          saveAuth({ ...stored, balance: data.balance })
-        }
+        if (stored) _saveAuth({ ...stored, balance: data.balance })
       }
+
+      // Auto-save to history (upsert per session)
+      const summary = stripMarkdown(reply).slice(0, 140)
+      const firstUserMsg = updatedMessages.find(m => m.role === 'user')?.content ?? ''
+      const entry = {
+        tool: 'ask' as const,
+        title: firstUserMsg.slice(0, 60) + (firstUserMsg.length > 60 ? '…' : ''),
+        summary,
+        date: new Date().toISOString().split('T')[0],
+        data: { messages: updatedMessages },
+      }
+      if (historyIdRef.current) updateHistoryEntry(historyIdRef.current, entry)
+      else historyIdRef.current = addHistoryEntry(entry)
     } catch {
       setError(lang === 'bg' ? 'Грешка при връзката' : lang === 'ru' ? 'Ошибка соединения' : 'Connection error')
       setMessages(prev => prev.slice(0, -1))

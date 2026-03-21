@@ -6,8 +6,7 @@ import ThinkingOrb from '../components/ThinkingOrb'
 import AiStatusBadge from '../components/AiStatusBadge'
 import { calculateChart, calculateTodayPillars, serializeChart, serializeToday } from '../engine/baziCalculator'
 import { t, LIFE_AREA_EMOJIS } from '../engine/translations'
-import { loadAuth, saveAuth } from '../utils/storage'
-import { loadTodayReading, saveReading } from '../utils/storage'
+import { loadAuth, saveAuth, loadTodayReading, saveReading, addHistoryEntry } from '../utils/storage'
 import { getInterpretation } from '../utils/api'
 import type { Language, UserProfile, BaziChart, TodayPillars, DailyReading, LifeAreaRating } from '../engine/types'
 
@@ -135,6 +134,13 @@ export default function Today({ profile, lang }: Props) {
       const r: DailyReading = { ...data, date: todayPillars.date, tokensRemaining }
       saveReading(r)
       setReading(r)
+      addHistoryEntry({
+        tool: 'today',
+        title: `${lang === 'bg' ? 'Дневно четене' : lang === 'ru' ? 'Дневное чтение' : 'Daily Reading'} – ${todayPillars.date}`,
+        summary: r.interpretation?.slice(0, 140) ?? '',
+        date: todayPillars.date,
+        data: r,
+      })
       const a = loadAuth()
       if (a) saveAuth({ ...a, balance: tokensRemaining })
     } catch (err: unknown) {
