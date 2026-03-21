@@ -78,13 +78,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const semanticQuery = `${lastUserMsg}\n\nChart context: ${chartCtx}`
 
   // Fetch semantically relevant knowledge (25 rules, vector search → tag fallback)
-  // Wrapped in catch so any RAG failure degrades gracefully (chat still works)
-  const knowledge = await fetchRelevantKnowledge(
-    semanticQuery,
-    chart as Record<string, unknown>,
-    supabase,
-    25,
-  ).catch(err => { console.error('RAG failed, continuing without knowledge:', err); return '' })
+  // Capped at 5 seconds so a slow Supabase query never causes a Vercel timeout
+  const knowledge = await Promise.race([
+    fetchRelevantKnowledge(
+      semanticQuery,
+      chart as Record<string, unknown>,
+      supabase,
+      25,
+    ),
+    new Promise<string>(resolve => setTimeout(() => resolve(''), 5000)),
+  ]).catch(err => { console.error('RAG failed, continuing without knowledge:', err); return '' })
 
   const lang = language === 'bg' ? 'Bulgarian' : language === 'ru' ? 'Russian' : 'English'
 
@@ -97,8 +100,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   ].filter(Boolean).join('\n\n')
 
   try {
+    const ac = new AbortController()
+    const timeoutId = setTimeout(() => ac.abort(), 50_000) // 50s hard cap (fits within maxDuration:60)
+
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
+      signal: ac.signal,
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
@@ -113,6 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         max_tokens: 600,
       }),
     })
+    clearTimeout(timeoutId)
 
     if (!response.ok) throw new Error(`DeepSeek ${response.status}`)
     const data = await response.json() as { choices: Array<{ message: { content: string } }> }
@@ -121,6 +129,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ reply, tokensRemaining: balance })
   } catch (err) {
     console.error('Chat error:', err)
-    return res.status(500).json({ error: 'AI request failed' })
+    const msg = err instanceof Error && err.name === 'AbortError'
+      ? 'AI request timed out – please try again'
+      : 'AI request failed'
+    return res.status(500).json({ error: msg })
   }
 }

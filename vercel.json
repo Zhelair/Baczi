@@ -2,5 +2,12 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/chat.ts":      { "maxDuration": 60 },
+    "api/interpret.ts": { "maxDuration": 60 },
+    "api/auth.ts":      { "maxDuration": 30 },
+    "api/admin.ts":     { "maxDuration": 30 },
+    "api/knowledge.ts": { "maxDuration": 30 }
+  }
 }
