@@ -116,17 +116,22 @@ export async function fetchRelevantKnowledge(
   const tags = extractPinyinTags(chart)
   if (tags.length === 0) return ''
 
-  const { data: fallback } = await supabase
-    .from('bazi_knowledge')
-    .select('pattern, rule_text, school')
-    .overlaps('tags', tags)
-    .in('confidence', confidence)
-    .order('confidence', { ascending: true })
-    .limit(limit)
+  try {
+    const { data: fallback } = await supabase
+      .from('bazi_knowledge')
+      .select('pattern, rule_text, school')
+      .overlaps('tags', tags)
+      .in('confidence', confidence)
+      .order('confidence', { ascending: true })
+      .limit(limit)
 
-  if (!fallback || fallback.length === 0) return ''
-  const lines = (fallback as KnowledgeRow[]).map(r =>
-    `• ${r.pattern ? r.pattern + ': ' : ''}${r.rule_text}`
-  )
-  return `Relevant BaZi rules (tag match):\n${lines.join('\n')}`
+    if (!fallback || fallback.length === 0) return ''
+    const lines = (fallback as KnowledgeRow[]).map(r =>
+      `• ${r.pattern ? r.pattern + ': ' : ''}${r.rule_text}`
+    )
+    return `Relevant BaZi rules (tag match):\n${lines.join('\n')}`
+  } catch (err) {
+    console.warn('RAG tag fallback failed:', err)
+    return ''
+  }
 }

@@ -78,12 +78,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const semanticQuery = `${lastUserMsg}\n\nChart context: ${chartCtx}`
 
   // Fetch semantically relevant knowledge (25 rules, vector search → tag fallback)
+  // Wrapped in catch so any RAG failure degrades gracefully (chat still works)
   const knowledge = await fetchRelevantKnowledge(
     semanticQuery,
     chart as Record<string, unknown>,
     supabase,
     25,
-  )
+  ).catch(err => { console.error('RAG failed, continuing without knowledge:', err); return '' })
 
   const lang = language === 'bg' ? 'Bulgarian' : language === 'ru' ? 'Russian' : 'English'
 
