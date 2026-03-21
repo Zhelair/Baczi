@@ -114,6 +114,29 @@ export const UI: Record<string, Record<Language, string>> = {
   free:            { bg: 'Безплатен',    ru: 'Бесплатный',en: 'Free'        },
   pro:             { bg: 'Про',          ru: 'Про',       en: 'Pro'         },
   max:             { bg: 'Макс',         ru: 'Макс',      en: 'Max'         },
+  // Locked feature screen
+  lockedProOnly:   { bg: 'Про и Макс функция', ru: 'Функция Про и Макс', en: 'Pro & Max Feature' },
+  lockedSubtitle:  { bg: 'Достъпно за абонати на Про и Макс', ru: 'Доступно для подписчиков Про и Макс', en: 'Available for Pro and Max subscribers' },
+  lockedCta:       { bg: 'Въведи своята Про парола', ru: 'Введите пароль Pro', en: 'Enter your Pro passphrase' },
+  lockedPassLabel: { bg: 'Парола за Про/Макс', ru: 'Пароль Про/Макс', en: 'Pro/Max Passphrase' },
+  lockedActivationsTitle: { bg: 'Активации', ru: 'Активации', en: 'Activations' },
+  lockedActivationsDesc:  {
+    bg: 'Виж как годишните, месечните и цикличните енергии взаимодействат с твоята натална карта. Открий сблъсъци, комбинации и хармонии — и как да използваш тези сили в своя полза.',
+    ru: 'Узнайте, как годовые, месячные и цикличные энергии взаимодействуют с вашей натальной картой. Откройте столкновения, комбинации и гармонии — и как использовать эти силы в своих интересах.',
+    en: 'See how annual, monthly, and luck-cycle energies interact with your natal chart. Discover clashes, combinations, and harmonies — and how to use these forces to your advantage.'
+  },
+  lockedFengshuiTitle: { bg: 'Фън Шуй', ru: 'Фэн Шуй', en: 'Feng Shui' },
+  lockedFengshuiDesc:  {
+    bg: 'Открий личния си Куа компас и Летящите звезди. Намери оптималните посоки за богатство, здраве и взаимоотношения — персонализирано за твоята карта и жилище.',
+    ru: 'Откройте личный компас Куа и Летящие звёзды. Найдите оптимальные направления для богатства, здоровья и отношений — персонально для вашей карты и жилища.',
+    en: 'Unlock your personal Kua compass and Flying Stars analysis. Find optimal directions for wealth, health, and relationships — personalised for your chart and home.'
+  },
+  lockedQmdjTitle: { bg: 'Ци Мън Дун Цзя', ru: 'Ци Мэнь Дунь Цзя', en: 'Qi Men Dun Jia' },
+  lockedQmdjDesc:  {
+    bg: 'Древната китайска стратегическа система за намиране на най-доброто време и посока за важни действия. Включва 9 дворци, 8 врати, звезди и божества — всичко в реално време.',
+    ru: 'Древняя китайская стратегическая система для поиска лучшего времени и направления для важных действий. Включает 9 дворцов, 8 врат, звёзды и божества — всё в реальном времени.',
+    en: 'The ancient Chinese strategic planning system for finding the best timing and direction for important actions. Includes 9 palaces, 8 gates, stars and deities — all in real time.'
+  },
 }
 
 // ─── Life area emojis ─────────────────────────────────────────────────────────

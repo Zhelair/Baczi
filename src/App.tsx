@@ -14,6 +14,7 @@ import Qmdj from './screens/Qmdj'
 import AdminPanel from './screens/AdminPanel'
 import AdminDashboard from './screens/AdminDashboard'
 import TabBar, { type Tab } from './components/TabBar'
+import LockedFeature from './components/LockedFeature'
 import { loadAuth, loadProfile, saveProfile, saveLang, loadLang, clearAll } from './utils/storage'
 import { useDailyReminder } from './utils/dailyReminder'
 import { calculateChart } from './engine/baziCalculator'
@@ -170,6 +171,17 @@ export default function App() {
   )
 
   const auth = loadAuth()
+  const isPaidTier = tier === 'pro' || tier === 'max' || tier === 'admin'
+
+  function handleUpgrade() {
+    const newAuth = loadAuth()
+    if (newAuth?.tier === 'admin') {
+      setState('admin')
+      return
+    }
+    if (loadProfile()) setState('app')
+    else setState('setup')
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950">
@@ -182,9 +194,21 @@ export default function App() {
       <div className="md:pl-52">
         {tab === 'today'       && (needsProfile ? setupPrompt : <Today profile={profile!} lang={lang} />)}
         {tab === 'chart'       && (needsProfile ? setupPrompt : <MyChart profile={profile!} lang={lang} />)}
-        {tab === 'activations' && (needsProfile ? setupPrompt : <Activations profile={profile!} lang={lang} />)}
-        {tab === 'fengshui'    && (needsProfile ? setupPrompt : <FengShui profile={profile!} lang={lang} />)}
-        {tab === 'qmdj'        && <Qmdj lang={lang} />}
+        {tab === 'activations' && (
+          !isPaidTier
+            ? <LockedFeature feature="activations" lang={lang} onUpgrade={handleUpgrade} />
+            : needsProfile ? setupPrompt : <Activations profile={profile!} lang={lang} />
+        )}
+        {tab === 'fengshui'    && (
+          !isPaidTier
+            ? <LockedFeature feature="fengshui" lang={lang} onUpgrade={handleUpgrade} />
+            : needsProfile ? setupPrompt : <FengShui profile={profile!} lang={lang} />
+        )}
+        {tab === 'qmdj'        && (
+          !isPaidTier
+            ? <LockedFeature feature="qmdj" lang={lang} onUpgrade={handleUpgrade} />
+            : <Qmdj lang={lang} />
+        )}
         {tab === 'lucky'       && (needsProfile ? setupPrompt : <LuckyDates profile={profile!} lang={lang} />)}
         {tab === 'ask'         && (needsProfile ? setupPrompt : (chart && <AskBazi chart={chart} lang={lang} />))}
         {tab === 'settings' && (
