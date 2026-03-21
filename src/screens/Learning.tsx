@@ -1,19 +1,20 @@
 import { useState } from 'react'
 import { BookOpen, Brain, CheckCircle2, Circle, FileText, Trash2, ChevronLeft, Plus, X } from 'lucide-react'
-import { LEARNING_TOPICS, CATEGORY_LABELS, type TopicCategory } from '../data/learningTopics'
+import { LEARNING_TOPICS, CATEGORY_LABELS, type TopicCategory, type LearningTopic } from '../data/learningTopics'
 import {
   loadNotes, saveNotes, loadTopicProgress, saveTopicProgress,
   type LearningNote, type TopicStatus,
 } from '../utils/storage'
 import { t } from '../engine/translations'
-import type { Language } from '../engine/types'
+import StudyChat from '../components/StudyChat'
+import type { Language, BaziChart } from '../engine/types'
 
 type Filter = 'all' | 'in_progress' | 'not_started' | 'completed'
-type View = 'topics' | 'notes'
+type View = 'topics' | 'notes' | 'study'
 
 interface Props {
   lang: Language
-  onStudy: (topicId: string, topicTitle: string, mode: 'study' | 'quiz') => void
+  chart: BaziChart | null
 }
 
 function statusColor(status: TopicStatus) {
@@ -37,9 +38,11 @@ function categoryColor(cat: TopicCategory): string {
   }[cat]
 }
 
-export default function Learning({ lang, onStudy }: Props) {
+export default function Learning({ lang, chart }: Props) {
   const [view, setView] = useState<View>('topics')
   const [filter, setFilter] = useState<Filter>('all')
+  const [activeStudyTopic, setActiveStudyTopic] = useState<LearningTopic | null>(null)
+  const [activeStudyMode, setActiveStudyMode] = useState<'study' | 'quiz'>('study')
   const [progress, setProgress] = useState<Record<string, TopicStatus>>(() => loadTopicProgress())
   const [notes, setNotes] = useState<LearningNote[]>(() => loadNotes())
   const [noteFilter, setNoteFilter] = useState<string>('all')
@@ -108,6 +111,26 @@ export default function Learning({ lang, onStudy }: Props) {
 
   const dateLocale = lang === 'bg' ? 'bg-BG' : lang === 'ru' ? 'ru-RU' : 'en-US'
 
+  // ── STUDY VIEW (inline chat) ──────────────────────────────────────────────
+  if (view === 'study' && activeStudyTopic && chart) {
+    return (
+      <div className="flex flex-col pb-24 md:pb-4 px-4 md:px-8 pt-6 max-w-4xl mx-auto" style={{ height: 'calc(100vh - 0px)' }}>
+        <StudyChat
+          topic={activeStudyTopic}
+          mode={activeStudyMode}
+          chart={chart}
+          lang={lang}
+          onBack={() => setView('topics')}
+          onMarkDone={() => {
+            setStatus(activeStudyTopic.id, 'completed')
+            setView('topics')
+          }}
+        />
+      </div>
+    )
+  }
+
+  // ── TOPICS / NOTES VIEW ───────────────────────────────────────────────────
   return (
     <div className="pb-24 md:pb-8 px-4 md:px-8 pt-6 max-w-5xl mx-auto">
 
@@ -375,7 +398,9 @@ export default function Learning({ lang, onStudy }: Props) {
                       <button
                         onClick={() => {
                           setStatus(topic.id, 'in_progress')
-                          onStudy(topic.id, topic.title[lang], 'study')
+                          setActiveStudyTopic(topic)
+                          setActiveStudyMode('study')
+                          setView('study')
                         }}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-zinc-700 hover:border-amber-500/50 text-zinc-300 hover:text-amber-400 text-xs font-medium transition-colors"
                       >
@@ -385,7 +410,9 @@ export default function Learning({ lang, onStudy }: Props) {
                       <button
                         onClick={() => {
                           setStatus(topic.id, 'in_progress')
-                          onStudy(topic.id, topic.title[lang], 'quiz')
+                          setActiveStudyTopic(topic)
+                          setActiveStudyMode('quiz')
+                          setView('study')
                         }}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-zinc-700 hover:border-purple-500/50 text-zinc-300 hover:text-purple-400 text-xs font-medium transition-colors"
                       >

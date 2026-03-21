@@ -116,6 +116,7 @@ export const UI: Record<string, Record<Language, string>> = {
   max:             { bg: 'Макс',         ru: 'Макс',      en: 'Max'         },
   // Navigation
   learn:           { bg: 'Обучение',    ru: 'Обучение',   en: 'Learn'       },
+  history:         { bg: 'История',     ru: 'История',    en: 'History'     },
   // Learning screen
   learnTitle:      { bg: 'Обучение',    ru: 'Обучение',   en: 'Learning'    },
   learnTopics:     { bg: 'теми',        ru: 'тем',        en: 'topics'      },

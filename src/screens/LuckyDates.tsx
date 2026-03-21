@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { calculateChart, calculateTodayPillars, serializeChart, serializeToday } from '../engine/baziCalculator'
 import { t } from '../engine/translations'
 import { getInterpretation } from '../utils/api'
-import { loadAuth, saveAuth } from '../utils/storage'
+import { loadAuth, saveAuth, addHistoryEntry } from '../utils/storage'
 import TokenBadge from '../components/TokenBadge'
 import ThinkingOrb from '../components/ThinkingOrb'
 import AiStatusBadge from '../components/AiStatusBadge'
@@ -44,6 +44,14 @@ export default function LuckyDates({ profile, lang }: Props) {
       setResult(data)
       const a = loadAuth()
       if (a) saveAuth({ ...a, balance: tokensRemaining })
+      const todayDate = new Date().toISOString().split('T')[0]
+      addHistoryEntry({
+        tool: 'lucky',
+        title: `${lang === 'bg' ? 'Проверка на удачата' : lang === 'ru' ? 'Проверка удачи' : 'Lucky Check'} – ${todayDate}`,
+        summary: data.summary?.slice(0, 140) ?? '',
+        date: todayDate,
+        data,
+      })
     } catch (err: unknown) {
       const e = err as { status?: number }
       if (e.status === 429) setError(t('errorTokens', lang))

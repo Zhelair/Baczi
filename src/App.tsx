@@ -7,11 +7,12 @@ import Today from './screens/Today'
 import MyChart from './screens/MyChart'
 import LuckyDates from './screens/LuckyDates'
 import Settings from './screens/Settings'
-import AskBazi, { type StudyContext } from './screens/AskBazi'
+import AskBazi from './screens/AskBazi'
 import Activations from './screens/Activations'
 import FengShui from './screens/FengShui'
 import Qmdj from './screens/Qmdj'
 import Learning from './screens/Learning'
+import History from './screens/History'
 import AdminPanel from './screens/AdminPanel'
 import AdminDashboard from './screens/AdminDashboard'
 import LockedFeature from './components/LockedFeature'
@@ -19,7 +20,6 @@ import TabBar, { type Tab } from './components/TabBar'
 import { loadAuth, loadProfile, saveProfile, saveLang, loadLang, clearAll, loadSidebarCollapsed, saveSidebarCollapsed } from './utils/storage'
 import { useDailyReminder } from './utils/dailyReminder'
 import { calculateChart } from './engine/baziCalculator'
-import { LEARNING_TOPICS } from './data/learningTopics'
 import type { Language, Theme, Tier, UserProfile } from './engine/types'
 
 type AppState = 'lang' | 'passphrase' | 'setup' | 'admin' | 'app'
@@ -40,7 +40,6 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() => loadLang() ?? loadProfile()?.language ?? 'bg')
   const [tab, setTab] = useState<Tab>('today')
   const [collapsed, setCollapsed] = useState(() => loadSidebarCollapsed())
-  const [studyContext, setStudyContext] = useState<StudyContext | null>(null)
   const tier = loadAuth()?.tier as Tier | undefined
 
   const chart = useMemo(() => {
@@ -125,14 +124,6 @@ export default function App() {
     else setState('setup')
   }
 
-  function handleStudy(topicId: string, topicTitle: string, mode: 'study' | 'quiz') {
-    const topic = LEARNING_TOPICS.find(t => t.id === topicId)
-    if (!topic) return
-    const prompt = mode === 'study' ? topic.studyPrompt[lang] : topic.quizPrompt[lang]
-    setStudyContext({ topicId, topicTitle, mode, prompt })
-    setTab('ask')
-  }
-
   if (state === 'lang') return <LangSelect onSelect={handleLangSelect} />
   if (state === 'passphrase') return <Passphrase lang={lang} onSuccess={handleAuthSuccess} />
   if (state === 'admin') {
@@ -201,16 +192,16 @@ export default function App() {
           <AskBazi
             chart={chart}
             lang={lang}
-            studyContext={studyContext}
-            onNavigateToNotes={() => { setStudyContext(null); setTab('learn') }}
+            onNavigateToNotes={() => setTab('learn')}
           />
         )))}
         {tab === 'learn'       && (
           <Learning
             lang={lang}
-            onStudy={handleStudy}
+            chart={chart}
           />
         )}
+        {tab === 'history'     && <History lang={lang} />}
         {tab === 'lucky'       && (needsProfile ? setupPrompt : <LuckyDates profile={profile!} lang={lang} />)}
         {tab === 'settings'    && (
           needsProfile
@@ -228,11 +219,7 @@ export default function App() {
 
       <TabBar
         active={tab}
-        onSelect={(newTab) => {
-          // Clear study context when manually navigating away from ask
-          if (newTab !== 'ask') setStudyContext(null)
-          setTab(newTab)
-        }}
+        onSelect={setTab}
         lang={lang}
         tier={tier}
         collapsed={collapsed}

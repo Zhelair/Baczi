@@ -17,8 +17,22 @@ export interface LearningNote {
 
 export type TopicStatus = 'not_started' | 'in_progress' | 'completed'
 
+export type HistoryTool = 'today' | 'ask' | 'lucky' | 'study'
+
+export interface HistoryEntry {
+  id: string
+  tool: HistoryTool
+  title: string       // e.g. "Daily Reading – 21 Mar" or topic name
+  summary: string     // first ~120 chars of the main content
+  date: string        // ISO date
+  data: unknown       // full serialized payload
+}
+
+const HISTORY_MAX = 100  // max entries total
+
 const KEYS = {
   AUTH:              'baczi_auth',
+  HISTORY:           'baczi_history',
   PROFILE:           'baczi_profile',
   READING:           'baczi_reading',
   ADMIN_TOKEN:       'baczi_admin_token',
@@ -143,6 +157,37 @@ export function loadSidebarCollapsed(): boolean {
 
 export function saveSidebarCollapsed(v: boolean) {
   localStorage.setItem(KEYS.SIDEBAR_COLLAPSED, String(v))
+}
+
+export function loadHistory(): HistoryEntry[] {
+  try { return JSON.parse(localStorage.getItem(KEYS.HISTORY) ?? '[]') as HistoryEntry[] }
+  catch { return [] }
+}
+
+export function addHistoryEntry(entry: Omit<HistoryEntry, 'id'>): string {
+  const id = `${entry.tool}_${Date.now()}`
+  const all = loadHistory()
+  const updated = [{ ...entry, id }, ...all].slice(0, HISTORY_MAX)
+  localStorage.setItem(KEYS.HISTORY, JSON.stringify(updated))
+  return id
+}
+
+export function updateHistoryEntry(id: string, entry: Omit<HistoryEntry, 'id'>) {
+  const all = loadHistory()
+  const idx = all.findIndex(e => e.id === id)
+  if (idx === -1) { addHistoryEntry(entry); return }
+  all[idx] = { ...entry, id }
+  localStorage.setItem(KEYS.HISTORY, JSON.stringify(all))
+}
+
+export function deleteHistoryEntry(id: string) {
+  const updated = loadHistory().filter(e => e.id !== id)
+  localStorage.setItem(KEYS.HISTORY, JSON.stringify(updated))
+}
+
+export function clearHistoryByTool(tool: HistoryTool) {
+  const updated = loadHistory().filter(e => e.tool !== tool)
+  localStorage.setItem(KEYS.HISTORY, JSON.stringify(updated))
 }
 
 export function clearAll() {
