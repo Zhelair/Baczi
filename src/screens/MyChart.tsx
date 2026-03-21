@@ -204,11 +204,13 @@ export default function MyChart({ profile, lang }: Props) {
     })
 
   return (
-    <div className="pb-24 md:pb-8 px-4 md:px-8 pt-6 max-w-4xl mx-auto">
+    <div className="bz-page">
       {/* Header */}
-      <div className="mb-6 pt-8 md:pt-0">
-        <h2 className="text-lg font-semibold text-zinc-100">{profile.name}</h2>
-        <p className="text-zinc-500 text-sm">
+      <div className="mb-7">
+        <h2 className="text-xl font-bold tracking-tight">
+          <span className="bz-accent">{profile.name}</span>
+        </h2>
+        <p className="text-zinc-500 text-sm mt-0.5">
           {birthDateStr}
           {profile.birthHour !== null ? ` · ${String(profile.birthHour).padStart(2,'0')}:${String(profile.birthMinute ?? 0).padStart(2,'0')}` : ''}
         </p>
@@ -216,9 +218,9 @@ export default function MyChart({ profile, lang }: Props) {
 
       {/* Four Pillars */}
       <section className="mb-6">
-        <h3 className="text-xs uppercase tracking-wider text-zinc-500 mb-3">
+        <p className="bz-label mb-3">
           {lang === 'bg' ? 'Четирите стълба' : lang === 'ru' ? 'Четыре столпа' : 'Four Pillars'}
-        </h3>
+        </p>
         <div className="grid grid-cols-4 gap-2">
           <PillarCard label={t('hourPillar',  lang)} pillar={chart.hour}  unknownLabel={t('unknownHour', lang)} compact />
           <PillarCard label={t('dayPillar',   lang)} pillar={chart.day}   compact />
@@ -228,13 +230,13 @@ export default function MyChart({ profile, lang }: Props) {
       </section>
 
       {/* Day Master */}
-      <section className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-        <p className="text-xs uppercase tracking-wider text-zinc-500 mb-2">{t('dayMaster', lang)}</p>
-        <div className="flex items-center gap-3">
-          <span className={`chinese text-4xl element-${chart.dayMaster.elementKey}`}>{chart.dayMaster.gan}</span>
+      <section className="mb-6 bz-card p-4">
+        <p className="bz-label mb-3">{t('dayMaster', lang)}</p>
+        <div className="flex items-center gap-4">
+          <span className={`chinese text-5xl element-${chart.dayMaster.elementKey} leading-none`}>{chart.dayMaster.gan}</span>
           <div>
-            <p className="text-zinc-100 font-medium">{chart.dayMaster.element} {chart.dayMaster.polarity}</p>
-            <p className="text-zinc-500 text-sm">{t('zodiac', lang)}: {chart.zodiac}</p>
+            <p className="text-zinc-100 font-semibold">{chart.dayMaster.element} {chart.dayMaster.polarity}</p>
+            <p className="text-zinc-500 text-sm mt-0.5">{t('zodiac', lang)}: {chart.zodiac}</p>
           </div>
         </div>
       </section>

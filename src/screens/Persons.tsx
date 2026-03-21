@@ -160,7 +160,7 @@ export default function Persons({ ownProfile, lang, activePersonId, onActivate, 
   const activePerson = activePersonId ? persons.find(p => p.id === activePersonId) : null
 
   return (
-    <div className="pb-24 md:pb-8 px-4 md:px-8 pt-6 max-w-4xl mx-auto">
+    <div className="bz-page">
       {/* Active person banner */}
       {activePerson && (
         <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 flex items-center justify-between gap-3">

@@ -132,7 +132,7 @@ export default function Learning({ lang, chart }: Props) {
 
   // ── TOPICS / NOTES VIEW ───────────────────────────────────────────────────
   return (
-    <div className="pb-24 md:pb-8 px-4 md:px-8 pt-6 max-w-5xl mx-auto">
+    <div className="bz-page max-w-5xl">
 
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">

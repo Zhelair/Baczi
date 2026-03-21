@@ -78,7 +78,7 @@ export default function History({ lang }: Props) {
   const toolCounts = Object.fromEntries(tools.map(t => [t, entries.filter(e => e.tool === t).length])) as Record<HistoryTool, number>
 
   return (
-    <div className="pb-24 md:pb-8 px-4 md:px-8 pt-6 max-w-4xl mx-auto">
+    <div className="bz-page">
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
