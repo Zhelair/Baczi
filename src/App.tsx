@@ -7,16 +7,19 @@ import Today from './screens/Today'
 import MyChart from './screens/MyChart'
 import LuckyDates from './screens/LuckyDates'
 import Settings from './screens/Settings'
-import AskBazi from './screens/AskBazi'
+import AskBazi, { type StudyContext } from './screens/AskBazi'
 import Activations from './screens/Activations'
 import FengShui from './screens/FengShui'
 import Qmdj from './screens/Qmdj'
+import Learning from './screens/Learning'
 import AdminPanel from './screens/AdminPanel'
 import AdminDashboard from './screens/AdminDashboard'
+import LockedFeature from './components/LockedFeature'
 import TabBar, { type Tab } from './components/TabBar'
-import { loadAuth, loadProfile, saveProfile, saveLang, loadLang, clearAll } from './utils/storage'
+import { loadAuth, loadProfile, saveProfile, saveLang, loadLang, clearAll, loadSidebarCollapsed, saveSidebarCollapsed } from './utils/storage'
 import { useDailyReminder } from './utils/dailyReminder'
 import { calculateChart } from './engine/baziCalculator'
+import { LEARNING_TOPICS } from './data/learningTopics'
 import type { Language, Theme, Tier, UserProfile } from './engine/types'
 
 type AppState = 'lang' | 'passphrase' | 'setup' | 'admin' | 'app'
@@ -36,6 +39,8 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(() => loadProfile())
   const [lang, setLang] = useState<Language>(() => loadLang() ?? loadProfile()?.language ?? 'bg')
   const [tab, setTab] = useState<Tab>('today')
+  const [collapsed, setCollapsed] = useState(() => loadSidebarCollapsed())
+  const [studyContext, setStudyContext] = useState<StudyContext | null>(null)
   const tier = loadAuth()?.tier as Tier | undefined
 
   const chart = useMemo(() => {
@@ -50,17 +55,19 @@ export default function App() {
     } catch { return null }
   }, [profile, lang])
 
-  // Apply theme on mount and whenever profile.theme changes
-  useEffect(() => {
-    applyTheme(profile?.theme)
-  }, [profile?.theme])
+  useEffect(() => { applyTheme(profile?.theme) }, [profile?.theme])
 
   useEffect(() => {
     if (state === 'app' && !loadAuth()) setState('passphrase')
   }, [state])
 
-  // Daily 10:30 summary notification
   useDailyReminder(chart, lang)
+
+  function toggleCollapse() {
+    const next = !collapsed
+    setCollapsed(next)
+    saveSidebarCollapsed(next)
+  }
 
   function handleLangSelect(newLang: Language) {
     saveLang(newLang)
@@ -70,30 +77,19 @@ export default function App() {
 
   function handleAuthSuccess() {
     const auth = loadAuth()
-    if (auth?.tier === 'admin') {
-      setState('admin')
-      return
-    }
-    if (loadProfile()) {
-      setState('app')
-    } else {
-      setState('setup')
-    }
+    if (auth?.tier === 'admin') { setState('admin'); return }
+    if (loadProfile()) setState('app')
+    else setState('setup')
   }
 
   function handleSetupDone() {
     const p = loadProfile()
     setProfile(p)
-    if (p) {
-      setLang(p.language)
-      applyTheme(p.theme)
-    }
+    if (p) { setLang(p.language); applyTheme(p.theme) }
     setState('app')
   }
 
-  function handleSkipSetup() {
-    setState('app')
-  }
+  function handleSkipSetup() { setState('app') }
 
   function handleLangChange(newLang: Language) {
     saveLang(newLang)
@@ -122,32 +118,33 @@ export default function App() {
     setState('passphrase')
   }
 
-  if (state === 'lang') {
-    return <LangSelect onSelect={handleLangSelect} />
+  function handleUpgrade() {
+    const newAuth = loadAuth()
+    if (newAuth?.tier === 'admin') { setState('admin'); return }
+    if (loadProfile()) setState('app')
+    else setState('setup')
   }
 
-  if (state === 'passphrase') {
-    return <Passphrase lang={lang} onSuccess={handleAuthSuccess} />
+  function handleStudy(topicId: string, topicTitle: string, mode: 'study' | 'quiz') {
+    const topic = LEARNING_TOPICS.find(t => t.id === topicId)
+    if (!topic) return
+    const prompt = mode === 'study' ? topic.studyPrompt[lang] : topic.quizPrompt[lang]
+    setStudyContext({ topicId, topicTitle, mode, prompt })
+    setTab('ask')
   }
 
-  // Admin lands on their own dashboard, can optionally jump into the full app
+  if (state === 'lang') return <LangSelect onSelect={handleLangSelect} />
+  if (state === 'passphrase') return <Passphrase lang={lang} onSuccess={handleAuthSuccess} />
   if (state === 'admin') {
     return (
       <AdminDashboard
         lang={lang}
-        onGoToApp={() => {
-          if (loadProfile()) setState('app')
-          else setState('setup')
-        }}
+        onGoToApp={() => { if (loadProfile()) setState('app'); else setState('setup') }}
       />
     )
   }
+  if (state === 'setup') return <Setup lang={lang} onDone={handleSetupDone} onSkip={handleSkipSetup} />
 
-  if (state === 'setup') {
-    return <Setup lang={lang} onDone={handleSetupDone} onSkip={handleSkipSetup} />
-  }
-
-  // Prompt shown when profile is not set up yet
   const needsProfile = !profile
   const setupPrompt = (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
@@ -170,24 +167,52 @@ export default function App() {
   )
 
   const auth = loadAuth()
+  const isPaidTier = tier === 'pro' || tier === 'max' || tier === 'admin'
+  const sidebarWidth = collapsed ? 'md:pl-16' : 'md:pl-52'
 
   return (
-    <div className="min-h-screen bg-zinc-950">
-      {/* Global token badge — fixed top-right, visible on all pages */}
+    <div className="min-h-screen" style={{ background: 'var(--page-bg)' }}>
+      {/* Global token badge */}
       {auth && tab !== 'today' && (
-        <div className="fixed top-3 right-4 z-50">
+        <div className={`fixed top-3 right-4 z-50 transition-all duration-300`}>
           <TokenBadge balance={auth.balance} tier={auth.tier} resetDate={auth.resetDate} lang={lang} />
         </div>
       )}
-      <div className="md:pl-52">
+
+      <div className={`${sidebarWidth} transition-all duration-300`}>
         {tab === 'today'       && (needsProfile ? setupPrompt : <Today profile={profile!} lang={lang} />)}
         {tab === 'chart'       && (needsProfile ? setupPrompt : <MyChart profile={profile!} lang={lang} />)}
-        {tab === 'activations' && (needsProfile ? setupPrompt : <Activations profile={profile!} lang={lang} />)}
-        {tab === 'fengshui'    && (needsProfile ? setupPrompt : <FengShui profile={profile!} lang={lang} />)}
-        {tab === 'qmdj'        && <Qmdj lang={lang} />}
+        {tab === 'activations' && (
+          !isPaidTier
+            ? <LockedFeature feature="activations" lang={lang} onUpgrade={handleUpgrade} />
+            : needsProfile ? setupPrompt : <Activations profile={profile!} lang={lang} />
+        )}
+        {tab === 'fengshui'    && (
+          !isPaidTier
+            ? <LockedFeature feature="fengshui" lang={lang} onUpgrade={handleUpgrade} />
+            : needsProfile ? setupPrompt : <FengShui profile={profile!} lang={lang} />
+        )}
+        {tab === 'qmdj'        && (
+          !isPaidTier
+            ? <LockedFeature feature="qmdj" lang={lang} onUpgrade={handleUpgrade} />
+            : <Qmdj lang={lang} />
+        )}
+        {tab === 'ask'         && (needsProfile ? setupPrompt : (chart && (
+          <AskBazi
+            chart={chart}
+            lang={lang}
+            studyContext={studyContext}
+            onNavigateToNotes={() => { setStudyContext(null); setTab('learn') }}
+          />
+        )))}
+        {tab === 'learn'       && (
+          <Learning
+            lang={lang}
+            onStudy={handleStudy}
+          />
+        )}
         {tab === 'lucky'       && (needsProfile ? setupPrompt : <LuckyDates profile={profile!} lang={lang} />)}
-        {tab === 'ask'         && (needsProfile ? setupPrompt : (chart && <AskBazi chart={chart} lang={lang} />))}
-        {tab === 'settings' && (
+        {tab === 'settings'    && (
           needsProfile
             ? <Setup lang={lang} onDone={handleSetupDone} onSkip={handleSkipSetup} />
             : <Settings
@@ -200,7 +225,19 @@ export default function App() {
         )}
         {tab === 'admin' && tier === 'admin' && <AdminPanel />}
       </div>
-      <TabBar active={tab} onSelect={setTab} lang={lang} tier={tier} />
+
+      <TabBar
+        active={tab}
+        onSelect={(newTab) => {
+          // Clear study context when manually navigating away from ask
+          if (newTab !== 'ask') setStudyContext(null)
+          setTab(newTab)
+        }}
+        lang={lang}
+        tier={tier}
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapse}
+      />
     </div>
   )
 }

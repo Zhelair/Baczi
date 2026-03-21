@@ -7,14 +7,27 @@ export interface ChatSession {
   messages: { role: 'user' | 'assistant'; content: string }[]
 }
 
+export interface LearningNote {
+  id: string
+  topicId: string
+  topicTitle: string
+  content: string
+  date: string        // ISO date
+}
+
+export type TopicStatus = 'not_started' | 'in_progress' | 'completed'
+
 const KEYS = {
-  AUTH:          'baczi_auth',
-  PROFILE:       'baczi_profile',
-  READING:       'baczi_reading',
-  ADMIN_TOKEN:   'baczi_admin_token',
-  SESSIONS:      'baczi_sessions',
-  LANG:          'baczi_lang',
-  REMINDER_DATE: 'baczi_reminder_date',
+  AUTH:              'baczi_auth',
+  PROFILE:           'baczi_profile',
+  READING:           'baczi_reading',
+  ADMIN_TOKEN:       'baczi_admin_token',
+  SESSIONS:          'baczi_sessions',
+  LANG:              'baczi_lang',
+  REMINDER_DATE:     'baczi_reminder_date',
+  NOTES:             'baczi_notes',
+  TOPIC_PROGRESS:    'baczi_topic_progress',
+  SIDEBAR_COLLAPSED: 'baczi_sidebar_collapsed',
 } as const
 
 export function saveAuth(auth: AuthState) {
@@ -104,6 +117,32 @@ export function loadChatSessions(): ChatSession[] {
 
 export function saveChatSessions(sessions: ChatSession[]) {
   localStorage.setItem(KEYS.SESSIONS, JSON.stringify(sessions))
+}
+
+export function loadNotes(): LearningNote[] {
+  try { return JSON.parse(localStorage.getItem(KEYS.NOTES) ?? '[]') as LearningNote[] }
+  catch { return [] }
+}
+
+export function saveNotes(notes: LearningNote[]) {
+  localStorage.setItem(KEYS.NOTES, JSON.stringify(notes))
+}
+
+export function loadTopicProgress(): Record<string, TopicStatus> {
+  try { return JSON.parse(localStorage.getItem(KEYS.TOPIC_PROGRESS) ?? '{}') as Record<string, TopicStatus> }
+  catch { return {} }
+}
+
+export function saveTopicProgress(progress: Record<string, TopicStatus>) {
+  localStorage.setItem(KEYS.TOPIC_PROGRESS, JSON.stringify(progress))
+}
+
+export function loadSidebarCollapsed(): boolean {
+  return localStorage.getItem(KEYS.SIDEBAR_COLLAPSED) === 'true'
+}
+
+export function saveSidebarCollapsed(v: boolean) {
+  localStorage.setItem(KEYS.SIDEBAR_COLLAPSED, String(v))
 }
 
 export function clearAll() {
