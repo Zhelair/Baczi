@@ -44,10 +44,11 @@ export function getAnnualStar(date: Date = new Date()): StarNumber {
   const liChun = new Date(year, 1, 4) // Feb 4
   if (date < liChun) year -= 1
 
-  // Reference: 2024 → center star 1
+  // Reference: 2024 (Jia Chen 甲辰) → center star 3 (Jade Green 碧)
+  // Verified: 2022=5 (Five Yellow center), 2023=4, 2024=3, 2025=2, 2026=1
   // Star descends by 1 each year, wraps 1→9
   const delta = (year - 2024) % 9
-  const star = ((1 - delta - 1 + 9 * 100) % 9) + 1
+  const star = ((3 - delta - 1 + 9 * 100) % 9) + 1
   return star as StarNumber
 }
 
