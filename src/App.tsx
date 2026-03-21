@@ -40,9 +40,15 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(() => loadProfile())
   const [lang, setLang] = useState<Language>(() => loadLang() ?? loadProfile()?.language ?? 'bg')
   const [tab, setTab] = useState<Tab>('today')
+  const [tabKey, setTabKey] = useState(0)  // increments on same-tab re-click to force re-mount
   const [collapsed, setCollapsed] = useState(() => loadSidebarCollapsed())
   const [activePersonId, setActivePersonId] = useState<string | null>(null)
   const tier = loadAuth()?.tier as Tier | undefined
+
+  function handleTabSelect(newTab: Tab) {
+    if (newTab === tab) setTabKey(k => k + 1)  // same tab clicked: reset sub-navigation
+    else setTab(newTab)
+  }
 
   // When viewing someone else's chart, use their data as effectiveProfile
   const activePerson: PersonProfile | null = activePersonId
@@ -236,11 +242,12 @@ export default function App() {
         )))}
         {tab === 'learn'       && (
           <Learning
+            key={tabKey}
             lang={lang}
             chart={chart}
           />
         )}
-        {tab === 'history'     && <History lang={lang} />}
+        {tab === 'history'     && <History key={tabKey} lang={lang} />}
         {tab === 'persons'     && profile && (
           <Persons
             ownProfile={profile}
@@ -267,7 +274,7 @@ export default function App() {
 
       <TabBar
         active={tab}
-        onSelect={setTab}
+        onSelect={handleTabSelect}
         lang={lang}
         tier={tier}
         collapsed={collapsed}
