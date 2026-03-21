@@ -91,7 +91,7 @@ export default function TabBar({ active, onSelect, lang, tier, collapsed, onTogg
               <div>
                 <p className="text-zinc-100 text-sm font-bold tracking-tight leading-tight">BaZi</p>
                 <p className="text-zinc-500 text-[10px] leading-tight">
-                  {lang === 'bg' ? 'Китайска астрология' : lang === 'ru' ? 'Китайская астрология' : 'Chinese astrology'}
+                  {lang === 'bg' ? 'Китайска метафизика' : lang === 'ru' ? 'Китайская метафизика' : 'Chinese Metaphysics'}
                 </p>
               </div>
             </div>

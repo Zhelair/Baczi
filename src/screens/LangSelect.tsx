@@ -16,7 +16,7 @@ export default function LangSelect({ onSelect }: Props) {
       <div className="text-center mb-10">
         <div className="text-6xl mb-4">☯</div>
         <h1 className="text-2xl font-bold text-zinc-100">BaZi</h1>
-        <p className="text-zinc-500 text-sm mt-1">Chinese Astrology</p>
+        <p className="text-zinc-500 text-sm mt-1">Chinese Metaphysics</p>
       </div>
 
       <p className="text-zinc-400 text-sm mb-6">Choose your language / Изберете език / Выберите язык</p>
