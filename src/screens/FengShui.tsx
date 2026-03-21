@@ -18,6 +18,18 @@ import {
   type StarNumber,
   type SectorStar,
 } from '../engine/flyingStars'
+import {
+  generateHouseChart,
+  PERIODS,
+  FACING_LABEL,
+  CHART_TYPE_INFO,
+  PALACE_DIR_LABEL,
+  HOUSE_GRID_ORDER,
+  starQuality,
+  type FacingDir,
+  type HousePalaceData,
+} from '../engine/houseStars'
+import { STAR_INFO as FS_STAR_INFO } from '../engine/flyingStars'
 import type { Language, UserProfile } from '../engine/types'
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
@@ -360,9 +372,251 @@ function AnnualStarsSection({ lang }: { lang: Language }) {
   )
 }
 
+// ─── House Flying Stars Section ───────────────────────────────────────────────
+
+const FACING_DIRS: FacingDir[] = ['N','NE','E','SE','S','SW','W','NW']
+
+function qualityStyle(star: number, period: number) {
+  const q = starQuality(star, period)
+  if (q === 'auspicious')   return 'text-amber-300'
+  if (q === 'inauspicious') return 'text-red-400'
+  return 'text-zinc-400'
+}
+
+function HousePalaceCell({ p, period, isFacing, isSitting, lang }: {
+  p: HousePalaceData
+  period: number
+  isFacing: boolean
+  isSitting: boolean
+  lang: Language
+}) {
+  const mq = qualityStyle(p.mtnStar,   period)
+  const wq = qualityStyle(p.waterStar, period)
+  const bq = qualityStyle(p.baseStar,  period)
+
+  return (
+    <div className={`aspect-square rounded-xl border flex flex-col items-center justify-center gap-0.5 px-1
+      ${isFacing  ? 'border-sky-500/40 bg-sky-500/10' :
+        isSitting ? 'border-lime-500/40 bg-lime-500/10' :
+                    'border-zinc-700/40 bg-zinc-900/60'}`}>
+      <span className="text-[9px] text-zinc-600 leading-none">{PALACE_DIR_LABEL[p.palace][lang]}</span>
+
+      {/* Mountain | Water */}
+      <div className="flex items-center gap-1">
+        <span className={`text-sm font-bold leading-none ${mq}`}>{p.mtnStar}</span>
+        <span className="text-zinc-600 text-[10px]">/</span>
+        <span className={`text-sm font-bold leading-none ${wq}`}>{p.waterStar}</span>
+      </div>
+      {/* Base star */}
+      <span className={`text-[10px] leading-none ${bq} opacity-70`}>{p.baseStar}</span>
+
+      {isFacing  && <span className="text-[7px] text-sky-400 leading-none">向</span>}
+      {isSitting && <span className="text-[7px] text-lime-400 leading-none">坐</span>}
+    </div>
+  )
+}
+
+function HouseStarsSection({ lang }: { lang: Language }) {
+  const [builtYear, setBuiltYear] = useState(2010)
+  const [yearInput, setYearInput] = useState('2010')
+  const [facing, setFacing]       = useState<FacingDir>('S')
+
+  const chart = useMemo(() => generateHouseChart(builtYear, facing), [builtYear, facing])
+
+  // Derive facing palace from direction
+  const DIR_PAL: Record<FacingDir, number> = { N:1,SW:2,E:3,SE:4,S:9,NW:6,W:7,NE:8 }
+  const facingPalace  = DIR_PAL[facing]
+  const sittingPalace = 10 - facingPalace
+
+  const typeInfo = CHART_TYPE_INFO[chart.chartType]
+
+  function handleYearBlur() {
+    const y = parseInt(yearInput)
+    if (!isNaN(y) && y >= 1964 && y <= 2043) {
+      setBuiltYear(y)
+    } else {
+      setYearInput(String(builtYear))
+    }
+  }
+
+  // Best sectors: water star auspicious + mountain star auspicious
+  const rankedPalaces = [...chart.palaces].sort((a, b) => {
+    const score = (p: HousePalaceData) => {
+      const wq = starQuality(p.waterStar, chart.period)
+      const mq = starQuality(p.mtnStar,   chart.period)
+      return (wq === 'auspicious' ? 2 : wq === 'inauspicious' ? -2 : 0) +
+             (mq === 'auspicious' ? 1 : mq === 'inauspicious' ? -1 : 0)
+    }
+    return score(b) - score(a)
+  })
+
+  return (
+    <>
+      {/* Inputs */}
+      <div className="mb-5 rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+        {/* Year */}
+        <div>
+          <label className="text-xs text-zinc-500 block mb-1">
+            {lang === 'bg' ? 'Година на строеж / реновация' : lang === 'ru' ? 'Год постройки / обновления' : 'Year built / last renovated'}
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={yearInput}
+              min={1964} max={2043}
+              onChange={e => setYearInput(e.target.value)}
+              onBlur={handleYearBlur}
+              className="w-28 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm focus:outline-none focus:border-amber-500/50"
+            />
+            <span className="text-xs text-zinc-500">
+              {lang === 'bg' ? `Период` : lang === 'ru' ? `Период` : `Period`} {chart.period} ({chart.periodRange})
+            </span>
+          </div>
+          {/* Period quick-select */}
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            {PERIODS.map(p => (
+              <button
+                key={p.number}
+                onClick={() => { setBuiltYear(p.start + 10); setYearInput(String(p.start + 10)) }}
+                className={`text-xs px-2 py-1 rounded-lg border transition-colors ${
+                  chart.period === p.number
+                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                    : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {lang === 'bg' ? `П` : lang === 'ru' ? `П` : `P`}{p.number} {p.start}–{p.end}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Facing direction */}
+        <div>
+          <label className="text-xs text-zinc-500 block mb-1">
+            {lang === 'bg' ? 'Посока на фасадата (向)' : lang === 'ru' ? 'Направление фасада (向)' : 'Facing direction (向)'}
+          </label>
+          <div className="grid grid-cols-4 gap-1">
+            {FACING_DIRS.map(d => (
+              <button
+                key={d}
+                onClick={() => setFacing(d)}
+                className={`py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                  facing === d
+                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                    : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {FACING_LABEL[d].chinese} {d}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Chart type banner */}
+      <div className={`mb-5 rounded-xl border px-4 py-3 ${typeInfo.good ? 'border-lime-700/40 bg-lime-900/20' : 'border-red-800/40 bg-red-900/15'}`}>
+        <p className={`text-sm font-semibold ${typeInfo.good ? 'text-lime-300' : 'text-red-400'}`}>{typeInfo.name[lang]}</p>
+        <p className="text-xs text-zinc-500 mt-0.5 leading-snug">{typeInfo.desc[lang]}</p>
+      </div>
+
+      {/* 3×3 Grid */}
+      <section className="mb-5">
+        <div className="flex items-center gap-3 mb-2">
+          <h3 className="text-xs uppercase tracking-wider text-zinc-500">
+            {lang === 'bg' ? '山 / 向 / 运' : lang === 'ru' ? '山 / 向 / 运' : 'Mtn / Water / Base'}
+          </h3>
+          <div className="flex gap-2 text-[10px]">
+            <span className="text-sky-400">向 = {lang === 'bg' ? 'Фасада' : lang === 'ru' ? 'Фасад' : 'Facing'}</span>
+            <span className="text-lime-400">坐 = {lang === 'bg' ? 'Гръб' : lang === 'ru' ? 'Спина' : 'Sitting'}</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {HOUSE_GRID_ORDER.map(palace => {
+            const p = chart.palaces.find(x => x.palace === palace)!
+            return (
+              <HousePalaceCell
+                key={palace}
+                p={p}
+                period={chart.period}
+                isFacing={palace === facingPalace}
+                isSitting={palace === sittingPalace}
+                lang={lang}
+              />
+            )
+          })}
+        </div>
+        <p className="text-[10px] text-zinc-600 text-center mt-2">
+          {lang === 'bg' ? '山星 / 向星 / 运星 — натисни за детайли по-долу'
+          : lang === 'ru' ? '山星 / 向星 / 运星 — подробности ниже'
+          : '山星 / 向星 / 运星 — details below'}
+        </p>
+      </section>
+
+      {/* Sector breakdown */}
+      <section className="mb-5">
+        <h3 className="text-xs uppercase tracking-wider text-zinc-500 mb-3">
+          {lang === 'bg' ? 'Сектори — класирани' : lang === 'ru' ? 'Секторы — рейтинг' : 'Sectors — ranked'}
+        </h3>
+        <div className="space-y-2">
+          {rankedPalaces.map((p, rank) => {
+            const mq = starQuality(p.mtnStar,   chart.period)
+            const wq = starQuality(p.waterStar, chart.period)
+            const isGood = mq === 'auspicious' && wq === 'auspicious'
+            const isBad  = mq === 'inauspicious' || wq === 'inauspicious'
+            const mInfo = FS_STAR_INFO[p.mtnStar as keyof typeof FS_STAR_INFO]
+            const wInfo = FS_STAR_INFO[p.waterStar as keyof typeof FS_STAR_INFO]
+            return (
+              <div key={p.palace} className={`rounded-xl border px-4 py-3 ${
+                isGood ? 'bg-amber-500/5 border-amber-500/20' :
+                isBad  ? 'bg-red-900/15 border-red-800/30'   :
+                         'bg-zinc-900/40 border-zinc-800/50'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 text-center">
+                    <span className="text-xs text-zinc-600">#{rank+1}</span>
+                    <p className="text-xs font-bold text-zinc-400">{PALACE_DIR_LABEL[p.palace][lang]}</p>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex gap-3 mb-1">
+                      <span className="text-xs text-zinc-500">
+                        山 <span className={`font-bold ${qualityStyle(p.mtnStar, chart.period)}`}>{p.mtnStar}</span>
+                        {mInfo && <span className="text-zinc-600 ml-1">{mInfo.name[lang]}</span>}
+                      </span>
+                      <span className="text-xs text-zinc-500">
+                        向 <span className={`font-bold ${qualityStyle(p.waterStar, chart.period)}`}>{p.waterStar}</span>
+                        {wInfo && <span className="text-zinc-600 ml-1">{wInfo.name[lang]}</span>}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-600 leading-snug">
+                      {isGood
+                        ? (lang === 'bg' ? '✦ Активирай с вода и движение' : lang === 'ru' ? '✦ Активируй водой и движением' : '✦ Activate with water and movement')
+                        : isBad
+                        ? (lang === 'bg' ? '⚠ Постави метал/соленa вода' : lang === 'ru' ? '⚠ Размести металл/солёную воду' : '⚠ Place metal cure / salt water')
+                        : (lang === 'bg' ? '◆ Неутрален сектор' : lang === 'ru' ? '◆ Нейтральный сектор' : '◆ Neutral sector')
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      <p className="text-[11px] text-zinc-600 text-center leading-relaxed px-2">
+        {lang === 'bg'
+          ? 'Сянкун Фейсин (玄空飛星) е базиран на периода на строеж и ориентацията на фасадата. 山星 влияе на здравето, 向星 — на богатството.'
+          : lang === 'ru'
+          ? 'Сюань Кун Фэй Син (玄空飛星) основан на периоде постройки и ориентации фасада. 山星 влияет на здоровье, 向星 — на богатство.'
+          : 'Xuan Kong Fei Xing (玄空飛星) is based on construction period and facing direction. 山星 affects health; 向星 affects wealth.'}
+      </p>
+    </>
+  )
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-type Section = 'kua' | 'annual'
+type Section = 'kua' | 'annual' | 'house'
 
 interface Props {
   profile: UserProfile
@@ -373,8 +627,9 @@ export default function FengShui({ profile, lang }: Props) {
   const [section, setSection] = useState<Section>('kua')
 
   const sectionTabs: { id: Section; label: Record<Language, string> }[] = [
-    { id: 'kua',    label: { bg: 'Куа / 8 Мансиони', ru: 'Куа / 8 дворцов', en: 'Kua / 8 Mansions' } },
-    { id: 'annual', label: { bg: 'Годишни звезди',   ru: 'Годовые звёзды',  en: 'Annual Stars'      } },
+    { id: 'kua',    label: { bg: 'Куа',              ru: 'Куа',             en: 'Kua'           } },
+    { id: 'annual', label: { bg: 'Год. звезди',      ru: 'Год. звёзды',     en: 'Annual Stars'  } },
+    { id: 'house',  label: { bg: 'Натал. карта',     ru: 'Натал. карта',    en: 'House Chart'   } },
   ]
 
   return (
@@ -406,6 +661,7 @@ export default function FengShui({ profile, lang }: Props) {
 
       {section === 'kua'    && <KuaSection profile={profile} lang={lang} />}
       {section === 'annual' && <AnnualStarsSection lang={lang} />}
+      {section === 'house'  && <HouseStarsSection lang={lang} />}
     </div>
   )
 }
