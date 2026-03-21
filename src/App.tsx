@@ -9,6 +9,7 @@ import LuckyDates from './screens/LuckyDates'
 import Settings from './screens/Settings'
 import AskBazi from './screens/AskBazi'
 import Activations from './screens/Activations'
+import FengShui from './screens/FengShui'
 import AdminPanel from './screens/AdminPanel'
 import AdminDashboard from './screens/AdminDashboard'
 import TabBar, { type Tab } from './components/TabBar'
@@ -181,6 +182,7 @@ export default function App() {
         {tab === 'today'       && (needsProfile ? setupPrompt : <Today profile={profile!} lang={lang} />)}
         {tab === 'chart'       && (needsProfile ? setupPrompt : <MyChart profile={profile!} lang={lang} />)}
         {tab === 'activations' && (needsProfile ? setupPrompt : <Activations profile={profile!} lang={lang} />)}
+        {tab === 'fengshui'    && (needsProfile ? setupPrompt : <FengShui profile={profile!} lang={lang} />)}
         {tab === 'lucky'       && (needsProfile ? setupPrompt : <LuckyDates profile={profile!} lang={lang} />)}
         {tab === 'ask'         && (needsProfile ? setupPrompt : (chart && <AskBazi chart={chart} lang={lang} />))}
         {tab === 'settings' && (

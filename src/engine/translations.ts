@@ -56,6 +56,7 @@ export const UI: Record<string, Record<Language, string>> = {
   ask:             { bg: 'Попитай',     ru: 'Спроси',    en: 'Ask'         },
   admin:           { bg: 'Админ',       ru: 'Админ',     en: 'Admin'       },
   activations:     { bg: 'Активации',   ru: 'Активации', en: 'Activations' },
+  fengshui:        { bg: 'Фън Шуй',     ru: 'Фэн Шуй',   en: 'Feng Shui'   },
   // Auth
   passphraseTitle: { bg: '🔮 Въведи паролата', ru: '🔮 Введи пароль', en: '🔮 Enter Passphrase' },
   passphraseHint:  { bg: 'Паролата ти е получена при покупка', ru: 'Пароль получен при покупке', en: 'Your passphrase was provided upon purchase' },
