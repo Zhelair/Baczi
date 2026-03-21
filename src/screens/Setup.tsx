@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { saveProfile } from '../utils/storage'
+import { saveProfile, importProject, type BaziProject } from '../utils/storage'
 import { t } from '../engine/translations'
 import type { Language, UserProfile, Gender } from '../engine/types'
 
@@ -30,6 +30,27 @@ export default function Setup({ lang, onDone, onSkip }: Props) {
   const [birthTime, setBirthTime] = useState('')   // HH:MM
   const [gender, setGender] = useState<Gender>('female')
   const [error, setError] = useState('')
+  const [importError, setImportError] = useState('')
+  const importRef = useRef<HTMLInputElement>(null)
+
+  function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string) as BaziProject
+        if (data?.type !== 'bazi_project' || !data.profile) throw new Error('invalid')
+        importProject(data)
+        saveProfile({ ...data.profile, language: lang })
+        onDone()
+      } catch {
+        setImportError(lang === 'bg' ? 'Невалиден файл' : lang === 'ru' ? 'Неверный файл' : 'Invalid file')
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
 
   // City search
   const [cityQuery, setCityQuery] = useState('')
@@ -171,6 +192,32 @@ export default function Setup({ lang, onDone, onSkip }: Props) {
           </p>
         </div>
 
+        {/* Import from existing project */}
+        <div className="mb-6 p-4 rounded-xl border border-dashed border-zinc-700 text-center">
+          <p className="text-xs text-zinc-500 mb-3">
+            {lang === 'bg' ? 'Вече имаш проект? Импортирай го веднага.' :
+             lang === 'ru' ? 'Уже есть проект? Импортируйте его сразу.' :
+             'Already have a project? Import it directly.'}
+          </p>
+          <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
+          <button
+            type="button"
+            onClick={() => importRef.current?.click()}
+            className="bz-btn bz-btn-primary w-full"
+          >
+            {lang === 'bg' ? '↑ Импортирай JSON проект' : lang === 'ru' ? '↑ Импортировать JSON проект' : '↑ Import JSON Project'}
+          </button>
+          {importError && <p className="text-red-400 text-xs mt-2">{importError}</p>}
+        </div>
+
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex-1 h-px bg-zinc-800" />
+          <span className="text-xs text-zinc-600 uppercase tracking-wider">
+            {lang === 'bg' ? 'или въведи ръчно' : lang === 'ru' ? 'или ввести вручную' : 'or fill in manually'}
+          </span>
+          <div className="flex-1 h-px bg-zinc-800" />
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
           <div>
@@ -279,10 +326,7 @@ export default function Setup({ lang, onDone, onSkip }: Props) {
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
 
-          <button
-            type="submit"
-            className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-xl py-3 transition-colors mt-2"
-          >
+          <button type="submit" className="bz-btn bz-btn-primary w-full py-3 mt-2">
             {t('calculate', lang)}
           </button>
 

@@ -74,11 +74,27 @@ export default function Persons({ ownProfile, lang, activePersonId, onActivate, 
   function handleAdd() {
     const y = parseInt(form.year), m = parseInt(form.month), d = parseInt(form.day)
     if (!form.name.trim() || isNaN(y) || isNaN(m) || isNaN(d)) return
-    const h = form.hour !== '' ? parseInt(form.hour) : null
+
+    // Parse hour as HH:MM or plain number
+    let birthHour: number | null = null
+    let birthMinute: number | null = null
+    if (form.hour.trim()) {
+      const colonIdx = form.hour.indexOf(':')
+      if (colonIdx !== -1) {
+        birthHour = parseInt(form.hour.slice(0, colonIdx))
+        birthMinute = parseInt(form.hour.slice(colonIdx + 1))
+      } else {
+        birthHour = parseInt(form.hour)
+        birthMinute = 0
+      }
+      if (isNaN(birthHour) || birthHour < 0 || birthHour > 23) { birthHour = null; birthMinute = null }
+      if (birthMinute !== null && (isNaN(birthMinute) || birthMinute < 0 || birthMinute > 59)) birthMinute = 0
+    }
+
     const person = addPerson({
       name: form.name.trim(),
       birthYear: y, birthMonth: m, birthDay: d,
-      birthHour: h, birthMinute: h !== null ? 0 : null,
+      birthHour, birthMinute,
       gender: form.gender,
       note: form.note.trim() || undefined,
     })
@@ -252,7 +268,7 @@ export default function Persons({ ownProfile, lang, activePersonId, onActivate, 
             </div>
             <div>
               <label className="text-xs text-zinc-500 mb-1 block">{l('hour', lang)}</label>
-              <input type="number" placeholder="0-23" min={0} max={23} value={form.hour} onChange={e => setForm(f => ({ ...f, hour: e.target.value }))}
+              <input type="text" placeholder="16:30" value={form.hour} onChange={e => setForm(f => ({ ...f, hour: e.target.value }))}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-amber-500 transition-colors" />
             </div>
             <div className="col-span-2">
