@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { BookOpen, Brain, CheckCircle2, Circle, FileText, Trash2, ChevronLeft, Plus, X } from 'lucide-react'
+import { BookOpen, Brain, CheckCircle2, Circle, FileText, Trash2, ChevronLeft, Plus, X, Sparkles, Copy, Printer } from 'lucide-react'
 import { LEARNING_TOPICS, CATEGORY_LABELS, type TopicCategory, type LearningTopic } from '../data/learningTopics'
 import {
-  loadNotes, saveNotes, loadTopicProgress, saveTopicProgress,
+  loadNotes, saveNotes, loadTopicProgress, saveTopicProgress, loadAuth, saveAuth,
   type LearningNote, type TopicStatus,
 } from '../utils/storage'
 import { t } from '../engine/translations'
@@ -49,6 +49,70 @@ export default function Learning({ lang, chart }: Props) {
   const [showAddNote, setShowAddNote] = useState(false)
   const [newNoteContent, setNewNoteContent] = useState('')
   const [newNoteTopic, setNewNoteTopic] = useState('general')
+  // Summarize state
+  const [summary, setSummary] = useState<string | null>(null)
+  const [summarizing, setSummarizing] = useState(false)
+  const [summaryError, setSummaryError] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  async function handleSummarize(notesToSummarize: LearningNote[]) {
+    if (!notesToSummarize.length || summarizing) return
+    setSummarizing(true)
+    setSummaryError('')
+    setSummary(null)
+    const auth = loadAuth()
+    const noteText = notesToSummarize.map((n, i) =>
+      `[${i + 1}] ${n.topicTitle}:\n${n.content}`
+    ).join('\n\n---\n\n')
+    const prompt = lang === 'bg'
+      ? `Обобщи следните бележки за БаЦзъ в структурирано резюме с ключови идеи и изводи:\n\n${noteText}`
+      : lang === 'ru'
+      ? `Обобщи следующие заметки по БаЦзы в структурированное резюме с ключевыми идеями и выводами:\n\n${noteText}`
+      : `Summarize the following BaZi study notes into a structured summary with key insights and takeaways:\n\n${noteText}`
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth?.token ?? ''}` },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], language: lang }),
+      })
+      const data = await res.json() as { reply?: string; balance?: number; error?: string }
+      if (!res.ok) throw new Error(data.error ?? 'error')
+      if (data.balance !== undefined && auth) saveAuth({ ...auth, balance: data.balance })
+      setSummary(data.reply ?? '')
+    } catch {
+      setSummaryError(lang === 'bg' ? 'Грешка при обобщаване' : lang === 'ru' ? 'Ошибка при обобщении' : 'Summarization failed')
+    } finally {
+      setSummarizing(false)
+    }
+  }
+
+  function handleCopy(text: string) {
+    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) })
+  }
+
+  function handlePrint(notesToPrint: LearningNote[], summaryText: string | null) {
+    const titleText = lang === 'bg' ? 'Резюме на бележки' : lang === 'ru' ? 'Резюме заметок' : 'Notes Summary'
+    const win = window.open('', '_blank')
+    if (!win) return
+    const notesList = notesToPrint.map(n =>
+      `<div style="margin-bottom:1.5em;border-bottom:1px solid #eee;padding-bottom:1.5em">
+        <div style="font-size:11px;color:#888;margin-bottom:4px">${n.topicTitle} · ${new Date(n.date).toLocaleDateString()}</div>
+        <p style="margin:0;white-space:pre-wrap">${n.content}</p>
+       </div>`
+    ).join('')
+    win.document.write(`<!DOCTYPE html><html><head><title>${titleText}</title>
+      <style>body{font-family:system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#111;line-height:1.6}
+      h1{font-size:1.4em;margin-bottom:.3em}h2{font-size:1.1em;margin-top:2em;color:#333}
+      .summary{background:#fffbf0;border:1px solid #f0d080;border-radius:8px;padding:1.2em;margin-bottom:2em;white-space:pre-wrap}
+      @media print{.summary{border-color:#ccc}}</style></head>
+      <body><h1>${titleText}</h1>
+      ${summaryText ? `<h2>${lang === 'bg' ? 'AI Резюме' : lang === 'ru' ? 'AI Резюме' : 'AI Summary'}</h2><div class="summary">${summaryText}</div>` : ''}
+      <h2>${lang === 'bg' ? 'Бележки' : lang === 'ru' ? 'Заметки' : 'Notes'} (${notesToPrint.length})</h2>${notesList}
+      </body></html>`)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 300)
+  }
 
   function setStatus(topicId: string, status: TopicStatus) {
     const updated = { ...progress, [topicId]: status }
@@ -158,13 +222,26 @@ export default function Learning({ lang, chart }: Props) {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0 pt-1">
+          {view === 'notes' && filteredNotes.length > 0 && (
+            <button
+              onClick={() => { setSummary(null); handleSummarize(filteredNotes) }}
+              disabled={summarizing}
+              className="bz-btn bz-btn-ghost text-xs px-3 py-2"
+              title={lang === 'bg' ? 'Обобщи бележките с AI' : lang === 'ru' ? 'Обобщить заметки через AI' : 'Summarize notes with AI'}
+            >
+              <Sparkles size={12} />
+              {summarizing
+                ? (lang === 'bg' ? 'Обобщава...' : lang === 'ru' ? 'Обобщение...' : 'Summarizing...')
+                : (lang === 'bg' ? 'Обобщи' : lang === 'ru' ? 'Резюме' : 'Summarize')}
+            </button>
+          )}
           {view === 'notes' && (
             <button
               onClick={() => setShowAddNote(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-sm font-semibold transition-colors"
+              className="bz-btn bz-btn-primary text-xs px-3 py-2"
             >
-              <Plus size={14} />
-              {lang === 'bg' ? 'Добави' : lang === 'ru' ? 'Добавить' : 'Add Note'}
+              <Plus size={13} />
+              {lang === 'bg' ? 'Добави' : lang === 'ru' ? 'Добавить' : 'Add'}
             </button>
           )}
           <button
@@ -267,6 +344,55 @@ export default function Learning({ lang, chart }: Props) {
                   </button>
                 )
               })}
+            </div>
+          )}
+
+          {/* Summary panel */}
+          {(summary || summarizing || summaryError) && (
+            <div className="mb-5 bz-card p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={14} className="text-amber-400" />
+                  <span className="text-sm font-semibold text-zinc-200">
+                    {lang === 'bg' ? 'AI Резюме' : lang === 'ru' ? 'AI Резюме' : 'AI Summary'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {summary && (
+                    <>
+                      <button
+                        onClick={() => handleCopy(summary)}
+                        className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+                      >
+                        <Copy size={12} />
+                        {copied ? '✓' : (lang === 'bg' ? 'Копирай' : lang === 'ru' ? 'Копировать' : 'Copy')}
+                      </button>
+                      <button
+                        onClick={() => handlePrint(filteredNotes, summary)}
+                        className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+                      >
+                        <Printer size={12} />
+                        {lang === 'bg' ? 'Принтирай / PDF' : lang === 'ru' ? 'Печать / PDF' : 'Print / PDF'}
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => { setSummary(null); setSummaryError('') }}
+                    className="text-zinc-600 hover:text-zinc-400"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              </div>
+              {summarizing && (
+                <div className="flex items-center gap-2 text-sm text-zinc-500">
+                  <span className="animate-pulse">
+                    {lang === 'bg' ? '✦ Обобщавам...' : lang === 'ru' ? '✦ Обобщаю...' : '✦ Summarizing...'}
+                  </span>
+                </div>
+              )}
+              {summaryError && <p className="text-red-400 text-sm">{summaryError}</p>}
+              {summary && <p className="text-sm text-zinc-200 leading-relaxed whitespace-pre-wrap">{summary}</p>}
             </div>
           )}
 
