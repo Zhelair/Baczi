@@ -77,8 +77,15 @@ function chunkText(text, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP) {
 
 async function extractTextFromPdf(filePath) {
   // pdf-parse is CJS; use createRequire in ESM context
+  // v1 exports the function directly, v2 exports it as .default
   const require = createRequire(import.meta.url)
-  const pdfParse = require('pdf-parse')
+  const pdfParseModule = require('pdf-parse')
+  const pdfParse = typeof pdfParseModule === 'function'
+    ? pdfParseModule
+    : (pdfParseModule.default ?? pdfParseModule)
+  if (typeof pdfParse !== 'function') {
+    throw new Error(`pdf-parse did not export a callable function (got ${typeof pdfParseModule})`)
+  }
   const buffer = readFileSync(filePath)
   const data = await pdfParse(buffer)
   return data.text
