@@ -8,6 +8,7 @@ import MyChart from './screens/MyChart'
 import LuckyDates from './screens/LuckyDates'
 import Settings from './screens/Settings'
 import AskBazi from './screens/AskBazi'
+import Activations from './screens/Activations'
 import AdminPanel from './screens/AdminPanel'
 import AdminDashboard from './screens/AdminDashboard'
 import TabBar, { type Tab } from './components/TabBar'
@@ -177,10 +178,11 @@ export default function App() {
         </div>
       )}
       <div className="md:pl-52">
-        {tab === 'today'    && (needsProfile ? setupPrompt : <Today profile={profile!} lang={lang} />)}
-        {tab === 'chart'    && (needsProfile ? setupPrompt : <MyChart profile={profile!} lang={lang} />)}
-        {tab === 'lucky'    && (needsProfile ? setupPrompt : <LuckyDates profile={profile!} lang={lang} />)}
-        {tab === 'ask'      && (needsProfile ? setupPrompt : (chart && <AskBazi chart={chart} lang={lang} />))}
+        {tab === 'today'       && (needsProfile ? setupPrompt : <Today profile={profile!} lang={lang} />)}
+        {tab === 'chart'       && (needsProfile ? setupPrompt : <MyChart profile={profile!} lang={lang} />)}
+        {tab === 'activations' && (needsProfile ? setupPrompt : <Activations profile={profile!} lang={lang} />)}
+        {tab === 'lucky'       && (needsProfile ? setupPrompt : <LuckyDates profile={profile!} lang={lang} />)}
+        {tab === 'ask'         && (needsProfile ? setupPrompt : (chart && <AskBazi chart={chart} lang={lang} />))}
         {tab === 'settings' && (
           needsProfile
             ? <Setup lang={lang} onDone={handleSetupDone} onSkip={handleSkipSetup} />

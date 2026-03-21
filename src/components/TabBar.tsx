@@ -1,8 +1,8 @@
-import { Sun, BookOpen, Calendar, Settings, ShieldAlert, MessageCircle } from 'lucide-react'
+import { Sun, BookOpen, Calendar, Settings, ShieldAlert, MessageCircle, Zap } from 'lucide-react'
 import { t } from '../engine/translations'
 import type { Language, Tier } from '../engine/types'
 
-export type Tab = 'today' | 'chart' | 'lucky' | 'ask' | 'settings' | 'admin'
+export type Tab = 'today' | 'chart' | 'lucky' | 'ask' | 'activations' | 'settings' | 'admin'
 
 interface Props {
   active: Tab
@@ -12,11 +12,12 @@ interface Props {
 }
 
 const BASE_TABS: { id: Tab; icon: typeof Sun; labelKey: string }[] = [
-  { id: 'today',    icon: Sun,           labelKey: 'today'    },
-  { id: 'chart',    icon: BookOpen,      labelKey: 'chart'    },
-  { id: 'ask',      icon: MessageCircle, labelKey: 'ask'      },
-  { id: 'lucky',    icon: Calendar,      labelKey: 'lucky'    },
-  { id: 'settings', icon: Settings,      labelKey: 'settings' },
+  { id: 'today',       icon: Sun,           labelKey: 'today'       },
+  { id: 'chart',       icon: BookOpen,      labelKey: 'chart'       },
+  { id: 'activations', icon: Zap,           labelKey: 'activations' },
+  { id: 'ask',         icon: MessageCircle, labelKey: 'ask'         },
+  { id: 'lucky',       icon: Calendar,      labelKey: 'lucky'       },
+  { id: 'settings',    icon: Settings,      labelKey: 'settings'    },
 ]
 
 export default function TabBar({ active, onSelect, lang, tier }: Props) {
