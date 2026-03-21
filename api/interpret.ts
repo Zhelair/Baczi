@@ -37,26 +37,18 @@ async function fetchRelevantKnowledge(chart: Record<string, unknown>): Promise<s
   if (tags.length === 0) return ''
 
   const { bazi } = await getConfig()
-  let query = supabase
+  const { data, error } = await supabase
     .from('bazi_knowledge')
-    .select('pattern, rule_text, school, confidence')
+    .select('pattern, rule_text, confidence')
     .overlaps('tags', tags)
     .in('confidence', bazi.confidenceLevels)
     .order('confidence', { ascending: true }) // high first (alphabetically h < m)
     .limit(bazi.knowledgeLimit)
 
-  if (bazi.knowledgeSchool) {
-    query = query.eq('school', bazi.knowledgeSchool)
-  }
-
-  const { data, error } = await query
-
   if (error || !data || data.length === 0) return ''
 
-  const lines = data.map(r =>
-    `• [${r.school}] ${r.pattern}: ${r.rule_text}`
-  )
-  return `Classical BaZi knowledge relevant to this chart:\n${lines.join('\n')}`
+  const lines = data.map(r => `• ${r.pattern}: ${r.rule_text}`)
+  return `BaZi knowledge relevant to this chart:\n${lines.join('\n')}`
 }
 
 type Tier = 'free' | 'pro' | 'max' | 'admin'
@@ -88,7 +80,6 @@ interface BaziConfig {
   monthlyTokens: Record<Tier, number>
   knowledgeLimit: number
   confidenceLevels: string[]
-  knowledgeSchool: string   // '' = all, or 'joey_yap', 'classical', etc.
 }
 
 // Cache config for 60 s to avoid Supabase overhead on every request
@@ -113,14 +104,13 @@ async function getConfig(): Promise<{ ai: AiConfig; bazi: BaziConfig }> {
       monthlyTokens:    (map.bazi as BaziConfig | undefined)?.monthlyTokens    ?? DEFAULT_MONTHLY_TOKENS,
       knowledgeLimit:   (map.bazi as BaziConfig | undefined)?.knowledgeLimit   ?? 6,
       confidenceLevels: (map.bazi as BaziConfig | undefined)?.confidenceLevels ?? ['high', 'medium'],
-      knowledgeSchool:  (map.bazi as BaziConfig | undefined)?.knowledgeSchool  ?? '',
     }
     configCache = { ai, bazi, ts: Date.now() }
     return { ai, bazi }
   } catch {
     return {
       ai:   { model: 'deepseek-chat', temperature: 0.7, maxTokens: 1500, systemPromptExtra: '' },
-      bazi: { tokenCosts: DEFAULT_TOKEN_COSTS, monthlyTokens: DEFAULT_MONTHLY_TOKENS, knowledgeLimit: 6, confidenceLevels: ['high', 'medium'], knowledgeSchool: '' },
+      bazi: { tokenCosts: DEFAULT_TOKEN_COSTS, monthlyTokens: DEFAULT_MONTHLY_TOKENS, knowledgeLimit: 6, confidenceLevels: ['high', 'medium'] },
     }
   }
 }

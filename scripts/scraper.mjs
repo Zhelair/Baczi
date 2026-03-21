@@ -13,13 +13,12 @@
  *   1. knowledge/*.md           — curated rules (direct parse, no DeepSeek cost)
  *   2. knowledge/html/*.html    — local HTML files you saved from your browser
  *   3. Web sources (see WEB_SOURCES below) — DeepSeek extraction
- *      Priority school: joey_yap (fourpillars.ru)
- *      Other schools tagged per source, stored alongside
  *
- * Contradiction handling:
- *   Rules from different schools coexist in the DB tagged by `school`.
- *   The app filters by preferred school (joey_yap first) at query time.
- *   Conflicting rules are never deleted — they stay for reference.
+ * After all sources are processed, a dedup pass runs automatically:
+ *   - Rules with the same pattern (case-insensitive) are merged
+ *   - Keeps the highest confidence version (high > medium > low)
+ *   - If same confidence, keeps the longer rule_text
+ *   - If rule_text is truly identical, deletes the duplicate
  *
  * Each run is safe to re-run — upserts on (pattern, source_url), never duplicates.
  */
@@ -49,6 +48,7 @@ const SCHOOL_BY_DOMAIN = {
   'mingli.info':       'classical',
   'zi3.ru':            'classical',
   'feng-shui.ru':      'classical',
+  'tonmeta.com':       'classical',
   'fatemaster.ai':     'unknown',
   'bazi-lab.com':      'unknown',
   'cantian.ai':        'unknown',
@@ -155,16 +155,45 @@ function htmlToText(html) {
 
 function extractArticleLinks(html, baseUrl) {
   const links = new Set()
+  const base = new URL(baseUrl)
+
   const patterns = [
     /href="(\/(?:articles?|sections?|posts?|bazi|theory|knowledge|wiki|guide|blog|ten-gods|branches|stems|school)[^"]*?)"/gi,
     /href="(https?:\/\/(?:fourpillars\.ru|mingli\.info|zi3\.ru|feng-shui\.ru|fatemaster\.ai|bazi-lab\.com|cantian\.ai)[^"]*?)"/gi,
+    // tonmeta.com — capture all internal article links (URL-encoded Russian slugs)
+    /href="(\/[^"]+\/)"/gi,
   ]
+
+  // For cantian.ai wiki: only follow /wiki/ paths
+  const isCantian = base.hostname.includes('cantian.ai')
+  // For tonmeta.com: only follow same-host links that look like article slugs
+  const isTonmeta = base.hostname.includes('tonmeta.com')
+
   for (const pattern of patterns) {
     let match
     while ((match = pattern.exec(html)) !== null) {
       const href = match[1]
-      const full = href.startsWith('http') ? href : new URL(href, baseUrl).href
-      if (!full.match(/\?|#/) && full !== baseUrl) links.add(full)
+      try {
+        const full = href.startsWith('http') ? href : new URL(href, baseUrl).href
+        const parsed = new URL(full)
+
+        // Skip anchors, query strings, non-http
+        if (full.includes('#') || full.includes('?')) continue
+        if (!parsed.protocol.startsWith('http')) continue
+        if (full === baseUrl) continue
+
+        // cantian.ai: only /wiki/ subpages
+        if (isCantian && !parsed.pathname.startsWith('/wiki/')) continue
+
+        // tonmeta.com: only same host, skip pagination/tag/category pages
+        if (isTonmeta) {
+          if (parsed.hostname !== base.hostname) continue
+          if (parsed.pathname.match(/\/(page|tag|category|author)\//)) continue
+          if (parsed.pathname === '/' || parsed.pathname === '') continue
+        }
+
+        links.add(full)
+      } catch {}
     }
   }
   return [...links]
@@ -313,11 +342,6 @@ async function findFiles(dir, ext) {
 //
 // school field here becomes the hard-override school for all rules from that source.
 // 'unknown' means DeepSeek detects it from context.
-//
-// Priority:
-//   joey_yap  — fourpillars.ru (primary school for this app)
-//   classical — mingli.info, zi3.ru, forum.feng-shui.ru
-//   unknown   — fatemaster.ai, bazi-lab.com, cantian.ai (English, mixed schools)
 
 const WEB_SOURCES = [
   // ── Joey Yap school (primary) ─────────────────────────────────────────────
@@ -333,12 +357,77 @@ const WEB_SOURCES = [
   { url: 'https://mingli.info/theory',       lang: 'ru', school: 'classical', discover: true },
   { url: 'https://zi3.ru',                   lang: 'ru', school: 'classical', discover: true },
   { url: 'https://forum.feng-shui.ru',       lang: 'ru', school: 'classical', discover: true },
+  // tonmeta.com — Russian classical BaZi, crawl all articles from this page
+  { url: 'https://tonmeta.com/%d1%81%d0%b8%d1%81%d1%82%d0%b5%d0%bc%d0%b0-%d0%b1%d0%b0-%d1%86%d0%b7%d1%8b-%d1%87%d0%b0%d1%81%d1%82%d1%8c-%d0%bc%d0%b5%d1%82%d0%b0%d1%84%d0%b8%d0%b7%d0%b8%d0%ba%d0%b8/', lang: 'ru', school: 'classical', discover: true },
 
   // ── English sources (mixed schools, DeepSeek detects) ────────────────────
   { url: 'https://www.fatemaster.ai',        lang: 'en', school: 'unknown',  discover: true },
   { url: 'https://www.bazi-lab.com',         lang: 'en', school: 'unknown',  discover: true },
-  { url: 'https://cantian.ai',               lang: 'en', school: 'unknown',  discover: true },
+  // cantian.ai wiki — start at /wiki/intro and crawl all wiki subpages
+  { url: 'https://www.cantian.ai/wiki/intro', lang: 'en', school: 'unknown',  discover: true },
 ]
+
+// ── Deduplication ─────────────────────────────────────────────────────────────
+// After scraping, find rules with the same pattern (case-insensitive) and keep
+// only the best one:
+//   1. Highest confidence (high > medium > low)
+//   2. If same confidence, keep longer rule_text
+//   3. If rule_text is truly identical, delete the duplicate
+
+const CONFIDENCE_RANK = { high: 0, medium: 1, low: 2 }
+
+async function deduplicateRules() {
+  console.log('\n── Deduplication pass ──')
+
+  // Fetch all rules (id, pattern, rule_text, confidence)
+  const { data, error } = await supabase
+    .from('bazi_knowledge')
+    .select('id, pattern, rule_text, confidence')
+    .order('id', { ascending: true })
+
+  if (error || !data) {
+    console.log(`  Supabase error fetching rules: ${error?.message}`)
+    return
+  }
+
+  // Group by lowercase pattern
+  const groups = new Map()
+  for (const row of data) {
+    const key = row.pattern.toLowerCase()
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(row)
+  }
+
+  const duplicateGroups = [...groups.values()].filter(g => g.length > 1)
+  console.log(`  Found ${duplicateGroups.length} patterns with duplicates (${data.length} total rules)`)
+
+  let deleted = 0
+  for (const group of duplicateGroups) {
+    // Sort: best first (lowest confidence rank, then longest rule_text)
+    group.sort((a, b) => {
+      const rankDiff = (CONFIDENCE_RANK[a.confidence] ?? 1) - (CONFIDENCE_RANK[b.confidence] ?? 1)
+      if (rankDiff !== 0) return rankDiff
+      return b.rule_text.length - a.rule_text.length
+    })
+
+    const [keep, ...remove] = group
+    const idsToDelete = remove.map(r => r.id)
+
+    const { error: delErr } = await supabase
+      .from('bazi_knowledge')
+      .delete()
+      .in('id', idsToDelete)
+
+    if (delErr) {
+      console.log(`  Error deleting duplicates for pattern "${keep.pattern}": ${delErr.message}`)
+    } else {
+      console.log(`  Merged "${keep.pattern}" — kept id=${keep.id} (${keep.confidence}), removed ${idsToDelete.length} duplicate(s)`)
+      deleted += idsToDelete.length
+    }
+  }
+
+  console.log(`  Dedup done — removed ${deleted} duplicate rule(s)`)
+}
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -430,6 +519,9 @@ async function main() {
       }
     }
   }
+
+  // ── 4. Deduplication ─────────────────────────────────────────────────────────
+  await deduplicateRules()
 
   console.log('\n=== Done ===')
   console.log(`Total rules stored/updated: ${totalRules}`)
