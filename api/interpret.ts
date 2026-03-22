@@ -1,12 +1,55 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { jwtVerify } from 'jose'
 import { createClient } from '@supabase/supabase-js'
-import { fetchRelevantKnowledge, chartSummary } from './_rag'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+// ── Chinese char → English pinyin mapping for RAG tag lookup ─────────────────
+const CHAR_TO_PINYIN: Record<string, string> = {
+  // Heavenly Stems
+  '甲': 'Jia', '乙': 'Yi', '丙': 'Bing', '丁': 'Ding', '戊': 'Wu',
+  '己': 'Ji', '庚': 'Geng', '辛': 'Xin', '壬': 'Ren', '癸': 'Gui',
+  // Earthly Branches
+  '子': 'Zi', '丑': 'Chou', '寅': 'Yin', '卯': 'Mao', '辰': 'Chen',
+  '巳': 'Si', '午': 'Wu', '未': 'Wei', '申': 'Shen', '酉': 'You',
+  '戌': 'Xu', '亥': 'Hai',
+}
+
+function extractPinyinTags(chart: Record<string, unknown>): string[] {
+  const tags = new Set<string>()
+  const pillars = ['year', 'month', 'day', 'hour']
+  for (const pillar of pillars) {
+    const p = chart[pillar] as Record<string, string> | null | undefined
+    if (!p) continue
+    if (p.gan && CHAR_TO_PINYIN[p.gan]) tags.add(CHAR_TO_PINYIN[p.gan])
+    if (p.zhi && CHAR_TO_PINYIN[p.zhi]) tags.add(CHAR_TO_PINYIN[p.zhi])
+  }
+  const dm = chart.dayMaster as Record<string, string> | undefined
+  if (dm?.gan && CHAR_TO_PINYIN[dm.gan]) tags.add(CHAR_TO_PINYIN[dm.gan])
+  return [...tags]
+}
+
+async function fetchRelevantKnowledge(chart: Record<string, unknown>): Promise<string> {
+  const tags = extractPinyinTags(chart)
+  if (tags.length === 0) return ''
+
+  const { bazi } = await getConfig()
+  const { data, error } = await supabase
+    .from('bazi_knowledge')
+    .select('pattern, rule_text, confidence')
+    .overlaps('tags', tags)
+    .in('confidence', bazi.confidenceLevels)
+    .order('confidence', { ascending: true }) // high first (alphabetically h < m)
+    .limit(bazi.knowledgeLimit)
+
+  if (error || !data || data.length === 0) return ''
+
+  const lines = data.map(r => `• ${r.pattern}: ${r.rule_text}`)
+  return `BaZi knowledge relevant to this chart:\n${lines.join('\n')}`
+}
 
 type Tier = 'free' | 'pro' | 'max' | 'admin'
 type ActionType = 'daily_reading' | 'luck_check' | 'lucky_dates'
@@ -110,42 +153,30 @@ async function deductTokens(hash: string, tier: Tier, cost: number): Promise<{ o
 }
 
 async function callDeepSeek(prompt: string, systemPrompt?: string, aiCfg?: AiConfig): Promise<string> {
-  const cfg = aiCfg ?? { model: 'deepseek-chat', temperature: 0.7, maxTokens: 800, systemPromptExtra: '' }
+  const cfg = aiCfg ?? { model: 'deepseek-chat', temperature: 0.7, maxTokens: 1500, systemPromptExtra: '' }
   const messages: Array<{ role: string; content: string }> = []
 
   const fullSystem = [systemPrompt, cfg.systemPromptExtra].filter(Boolean).join('\n\n')
   if (fullSystem) messages.push({ role: 'system', content: fullSystem })
   messages.push({ role: 'user', content: prompt })
 
-  const useGroq = !!process.env.GROQ_API_KEY
-  const apiUrl = useGroq
-    ? 'https://api.groq.com/openai/v1/chat/completions'
-    : 'https://api.deepseek.com/chat/completions'
-  const apiKey = useGroq ? process.env.GROQ_API_KEY : process.env.DEEPSEEK_API_KEY
-  const model = useGroq ? 'llama-3.1-70b-versatile' : cfg.model
-
-  const ac = new AbortController()
-  const timeoutId = setTimeout(() => ac.abort(), 50_000)
-
-  const response = await fetch(apiUrl, {
+  const response = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
-    signal: ac.signal,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
     },
     body: JSON.stringify({
-      model,
+      model: cfg.model,
       messages,
       response_format: { type: 'json_object' },
       temperature: cfg.temperature,
-      max_tokens: Math.min(cfg.maxTokens, 800),
+      max_tokens: cfg.maxTokens,
     }),
   })
-  clearTimeout(timeoutId)
 
   if (!response.ok) {
-    throw new Error(`AI API error: ${response.status}`)
+    throw new Error(`DeepSeek API error: ${response.status}`)
   }
 
   const data = await response.json() as { choices: Array<{ message: { content: string } }> }
@@ -250,23 +281,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       prompt = buildDailyReadingPrompt(chart, today, language)
     }
 
-    // RAG: semantic vector search for relevant classical rules
-    // Capped at 5 seconds so slow Supabase queries never eat into DeepSeek's time budget
-    const { bazi: baziCfg2 } = await getConfig()
-    const actionDesc = action === 'luck_check'
-      ? 'daily luck check, brief summary'
-      : 'full daily reading with life area scores'
-    const semanticQuery = `${actionDesc}\n\nChart: ${chartSummary(chart as Record<string, unknown>)}`
-    const knowledge = await Promise.race([
-      fetchRelevantKnowledge(
-        semanticQuery,
-        chart as Record<string, unknown>,
-        supabase,
-        baziCfg2.knowledgeLimit ?? 25,
-        baziCfg2.confidenceLevels ?? ['high', 'medium'],
-      ),
-      new Promise<string>(resolve => setTimeout(() => resolve(''), 5000)),
-    ]).catch(() => '')
+    // RAG: inject relevant classical knowledge into system prompt
+    const knowledge = await fetchRelevantKnowledge(chart as Record<string, unknown>)
     const baseSystem = knowledge
       ? `You are a BaZi (Four Pillars of Destiny) master with deep knowledge of classical Chinese metaphysics. Use the following classical rules when relevant to improve accuracy:\n\n${knowledge}`
       : undefined
