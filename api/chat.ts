@@ -7,7 +7,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { jwtVerify } from 'jose'
 import { createClient } from '@supabase/supabase-js'
-import { fetchRelevantKnowledge, chartSummary } from './_rag'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -20,6 +19,13 @@ const CHAT_COST = 15
 
 const MONTHLY_TOKENS: Record<Tier, number> = {
   free: 500, pro: 2000, max: 10000, admin: 999999,
+}
+
+const CHAR_TO_PINYIN: Record<string, string> = {
+  '甲':'Jia','乙':'Yi','丙':'Bing','丁':'Ding','戊':'Wu',
+  '己':'Ji','庚':'Geng','辛':'Xin','壬':'Ren','癸':'Gui',
+  '子':'Zi','丑':'Chou','寅':'Yin','卯':'Mao','辰':'Chen',
+  '巳':'Si','午':'Wu','未':'Wei','申':'Shen','酉':'You','戌':'Xu','亥':'Hai',
 }
 
 function nextMonthReset() {
@@ -47,6 +53,46 @@ async function deductTokens(hash: string, tier: Tier): Promise<{ ok: boolean; ba
   return { ok: true, balance }
 }
 
+async function fetchKnowledge(chart: Record<string, unknown>): Promise<string> {
+  const tags = new Set<string>()
+  for (const key of ['year', 'month', 'day', 'hour']) {
+    const p = chart[key] as Record<string, string> | null | undefined
+    if (!p) continue
+    if (p.gan && CHAR_TO_PINYIN[p.gan]) tags.add(CHAR_TO_PINYIN[p.gan])
+    if (p.zhi && CHAR_TO_PINYIN[p.zhi]) tags.add(CHAR_TO_PINYIN[p.zhi])
+  }
+  if (!tags.size) return ''
+
+  const tagArr = [...tags]
+
+  // Prefer joey_yap (fourpillars.ru) school first, top 4 rules
+  const { data: primary } = await supabase
+    .from('bazi_knowledge')
+    .select('rule_text')
+    .overlaps('tags', tagArr)
+    .eq('school', 'joey_yap')
+    .in('confidence', ['high', 'medium'])
+    .limit(4)
+
+  // Fill remaining slots from any school (excluding already found patterns)
+  const needed = 6 - (primary?.length ?? 0)
+  let extra: { rule_text: string }[] = []
+  if (needed > 0) {
+    const { data } = await supabase
+      .from('bazi_knowledge')
+      .select('rule_text')
+      .overlaps('tags', tagArr)
+      .neq('school', 'joey_yap')
+      .in('confidence', ['high', 'medium'])
+      .limit(needed)
+    extra = data ?? []
+  }
+
+  const all = [...(primary ?? []), ...extra]
+  if (!all.length) return ''
+  return 'Relevant BaZi rules (Joey Yap school):\n' + all.map(r => `• ${r.rule_text}`).join('\n')
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -70,25 +116,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { ok, balance } = await deductTokens(payload.hash, payload.tier)
   if (!ok) return res.status(429).json({ error: 'Insufficient tokens', balance })
 
-  // Build semantic query: last user message + chart context
-  const lastUserMsg: string = [...messages].reverse().find(
-    (m: { role: string; content: string }) => m.role === 'user'
-  )?.content ?? ''
-  const chartCtx = chartSummary(chart as Record<string, unknown>)
-  const semanticQuery = `${lastUserMsg}\n\nChart context: ${chartCtx}`
-
-  // Fetch semantically relevant knowledge (25 rules, vector search → tag fallback)
-  // Capped at 5 seconds so a slow Supabase query never causes a Vercel timeout
-  const knowledge = await Promise.race([
-    fetchRelevantKnowledge(
-      semanticQuery,
-      chart as Record<string, unknown>,
-      supabase,
-      8,
-    ),
-    new Promise<string>(resolve => setTimeout(() => resolve(''), 5000)),
-  ]).catch(err => { console.error('RAG failed, continuing without knowledge:', err); return '' })
-
+  // Build system prompt with RAG
+  const knowledge = await fetchKnowledge(chart as Record<string, unknown>)
   const lang = language === 'bg' ? 'Bulgarian' : language === 'ru' ? 'Russian' : 'English'
 
   const systemPrompt = [
@@ -96,16 +125,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     `Always respond in ${lang}.`,
     `The user's chart: ${JSON.stringify(chart)}`,
     knowledge,
-    "Be warm, insightful, and specific to this person's chart. Keep answers concise (3-5 sentences) unless asked for detail.",
+    'Be warm, insightful, and specific to this person\'s chart. Keep answers concise (3-5 sentences) unless asked for detail.',
   ].filter(Boolean).join('\n\n')
 
   try {
-    const ac = new AbortController()
-    const timeoutId = setTimeout(() => ac.abort(), 50_000) // 50s hard cap (fits within maxDuration:60)
-
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
-      signal: ac.signal,
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
@@ -117,10 +142,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ...messages.slice(-10), // keep last 10 messages for context
         ],
         temperature: 0.8,
-        max_tokens: 400,
+        max_tokens: 600,
       }),
     })
-    clearTimeout(timeoutId)
 
     if (!response.ok) throw new Error(`DeepSeek ${response.status}`)
     const data = await response.json() as { choices: Array<{ message: { content: string } }> }
@@ -129,9 +153,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ reply, tokensRemaining: balance })
   } catch (err) {
     console.error('Chat error:', err)
-    const msg = err instanceof Error && err.name === 'AbortError'
-      ? 'AI request timed out – please try again'
-      : 'AI request failed'
-    return res.status(500).json({ error: msg })
+    return res.status(500).json({ error: 'AI request failed' })
   }
 }
