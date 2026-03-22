@@ -117,28 +117,35 @@ async function callDeepSeek(prompt: string, systemPrompt?: string, aiCfg?: AiCon
   if (fullSystem) messages.push({ role: 'system', content: fullSystem })
   messages.push({ role: 'user', content: prompt })
 
-  const ac = new AbortController()
-  const timeoutId = setTimeout(() => ac.abort(), 50_000) // 50s hard cap (fits within maxDuration:60)
+  const useGroq = !!process.env.GROQ_API_KEY
+  const apiUrl = useGroq
+    ? 'https://api.groq.com/openai/v1/chat/completions'
+    : 'https://api.deepseek.com/chat/completions'
+  const apiKey = useGroq ? process.env.GROQ_API_KEY : process.env.DEEPSEEK_API_KEY
+  const model = useGroq ? 'llama-3.1-70b-versatile' : cfg.model
 
-  const response = await fetch('https://api.deepseek.com/chat/completions', {
+  const ac = new AbortController()
+  const timeoutId = setTimeout(() => ac.abort(), 50_000)
+
+  const response = await fetch(apiUrl, {
     method: 'POST',
     signal: ac.signal,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: cfg.model,
+      model,
       messages,
       response_format: { type: 'json_object' },
       temperature: cfg.temperature,
-      max_tokens: Math.min(cfg.maxTokens, 800), // cap at 800 to stay within Vercel timeout
+      max_tokens: Math.min(cfg.maxTokens, 800),
     }),
   })
   clearTimeout(timeoutId)
 
   if (!response.ok) {
-    throw new Error(`DeepSeek API error: ${response.status}`)
+    throw new Error(`AI API error: ${response.status}`)
   }
 
   const data = await response.json() as { choices: Array<{ message: { content: string } }> }
