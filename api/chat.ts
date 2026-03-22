@@ -84,7 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       semanticQuery,
       chart as Record<string, unknown>,
       supabase,
-      25,
+      8,
     ),
     new Promise<string>(resolve => setTimeout(() => resolve(''), 5000)),
   ]).catch(err => { console.error('RAG failed, continuing without knowledge:', err); return '' })
@@ -117,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ...messages.slice(-10), // keep last 10 messages for context
         ],
         temperature: 0.8,
-        max_tokens: 600,
+        max_tokens: 400,
       }),
     })
     clearTimeout(timeoutId)

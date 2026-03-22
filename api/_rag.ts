@@ -122,7 +122,6 @@ export async function fetchRelevantKnowledge(
       .select('pattern, rule_text, school')
       .overlaps('tags', tags)
       .in('confidence', confidence)
-      .order('confidence', { ascending: true })
       .limit(limit)
 
     if (!fallback || fallback.length === 0) return ''
