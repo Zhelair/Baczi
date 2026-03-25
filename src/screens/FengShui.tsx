@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   getKuaResult,
   ENERGY_LABELS,
@@ -59,7 +59,7 @@ function compassColor(energy: EnergyType, auspicious: boolean): string {
   return map[energy] ?? 'bg-zinc-800 border-zinc-600 text-zinc-300'
 }
 
-function CompassRose({ directions }: { directions: DirectionEnergy[] }) {
+function CompassRose({ directions, lang }: { directions: DirectionEnergy[]; lang: Language }) {
   const byDir: Record<string, DirectionEnergy> = {}
   for (const d of directions) byDir[d.direction] = d
 
@@ -78,9 +78,9 @@ function CompassRose({ directions }: { directions: DirectionEnergy[] }) {
         const label = ENERGY_LABELS[d.energy]
         return (
           <div key={dir} className={`aspect-square rounded-xl border flex flex-col items-center justify-center gap-0.5 px-1 ${compassColor(d.energy, d.auspicious)}`}>
-            <span className="text-[10px] font-bold leading-none">{dir}</span>
-            <span className="text-sm leading-none">{DIRECTION_SYMBOLS[dir]}</span>
-            <span className="text-[8px] leading-none opacity-70 text-center">{label.chinese}</span>
+            <span className="text-[9px] font-bold leading-none opacity-70">{dir}</span>
+            <span className="text-[10px] font-semibold leading-none text-center">{label.name[lang]}</span>
+            <span className="text-[7px] leading-none opacity-50 text-center">{label.chinese}</span>
           </div>
         )
       })}
@@ -199,10 +199,10 @@ function KuaSection({ profile, lang }: { profile: UserProfile; lang: Language })
   const groupLabel = GROUP_LABELS[result.group][lang]
   const groupMates = result.group === 'east' ? '1, 3, 4, 9' : '2, 6, 7, 8'
   const tipText = lang === 'bg'
-    ? `Спи или работи с глава към ${bestDir.direction} — най-силната ти посока (${ENERGY_LABELS.shengqi.name[lang]}).`
+    ? `Най-силната ти посока е ${bestDir.direction} (${ENERGY_LABELS.shengqi.name[lang]}). ${ENERGY_LABELS.shengqi.tip[lang]}`
     : lang === 'ru'
-    ? `Спи или работай головой к ${bestDir.direction} — твоё сильнейшее направление (${ENERGY_LABELS.shengqi.name[lang]}).`
-    : `Sleep or work facing ${bestDir.direction} — your strongest direction (${ENERGY_LABELS.shengqi.name[lang]}).`
+    ? `Ваше сильнейшее направление — ${bestDir.direction} (${ENERGY_LABELS.shengqi.name[lang]}). ${ENERGY_LABELS.shengqi.tip[lang]}`
+    : `Your strongest direction: ${bestDir.direction} (${ENERGY_LABELS.shengqi.name[lang]}). ${ENERGY_LABELS.shengqi.tip[lang]}`
 
   return (
     <>
@@ -223,8 +223,8 @@ function KuaSection({ profile, lang }: { profile: UserProfile; lang: Language })
             </p>
           </div>
         </div>
-        <div className="mt-4 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2.5">
-          <p className="text-xs text-amber-300 leading-snug">💡 {tipText}</p>
+        <div className="mt-4 rounded-xl bg-amber-500/15 border border-amber-500/30 px-4 py-3">
+          <p className="text-sm font-medium text-amber-300 leading-snug">💡 {tipText}</p>
         </div>
       </div>
 
@@ -233,7 +233,7 @@ function KuaSection({ profile, lang }: { profile: UserProfile; lang: Language })
         <h3 className="text-xs uppercase tracking-wider text-zinc-500 mb-1">
           {lang === 'bg' ? 'Компас' : lang === 'ru' ? 'Компас' : 'Compass'}
         </h3>
-        <CompassRose directions={result.directions} />
+        <CompassRose directions={result.directions} lang={lang} />
         <div className="flex flex-wrap gap-3 justify-center mt-2">
           {auspicious.slice(0, 3).map((d, i) => (
             <span key={d.energy} className={`text-xs flex items-center gap-1 ${AUSPICIOUS_RANK_COLOR[i]}`}>
@@ -621,10 +621,26 @@ type Section = 'kua' | 'annual' | 'house'
 interface Props {
   profile: UserProfile
   lang: Language
+  guideMode?: boolean
+  onGuideOpen?: (entry: import('../data/guideContent').GuideEntry) => void
 }
 
-export default function FengShui({ profile, lang }: Props) {
+const FS_BANNER_KEY = 'fengshui_banner_dismissed'
+
+const FS_BANNER: Record<Language, string> = {
+  bg: 'Компасът ти показва личните ти посоки по Фън Шуй. Зелено = силна енергия. Използвай ги за спане, работа и срещи.',
+  ru: 'Компас показывает ваши личные направления по Фэн Шуй. Зелёное = сильная энергия. Используйте их для сна, работы и встреч.',
+  en: 'The compass shows your personal Feng Shui directions. Green = strong energy. Use them for sleeping, working, and meetings.',
+}
+
+export default function FengShui({ profile, lang, guideMode: _guideMode, onGuideOpen: _onGuideOpen }: Props) {
   const [section, setSection] = useState<Section>('kua')
+  const [bannerDismissed, setBannerDismissed] = useState(() => !!localStorage.getItem(FS_BANNER_KEY))
+
+  function dismissBanner() {
+    localStorage.setItem(FS_BANNER_KEY, '1')
+    setBannerDismissed(true)
+  }
 
   const sectionTabs: { id: Section; label: Record<Language, string> }[] = [
     { id: 'kua',    label: { bg: 'Куа',              ru: 'Куа',             en: 'Kua'           } },
@@ -641,6 +657,19 @@ export default function FengShui({ profile, lang }: Props) {
           {lang === 'bg' ? '🧭 Фън Шуй' : lang === 'ru' ? '🧭 Фэн Шуй' : '🧭 Feng Shui'}
         </h2>
       </div>
+
+      {/* Intro banner */}
+      {!bannerDismissed && (
+        <div className="mb-4 rounded-xl border border-teal-500/25 bg-teal-500/8 px-4 py-3 flex items-start gap-3">
+          <span className="text-lg shrink-0">🧭</span>
+          <p className="text-xs text-teal-300 leading-snug flex-1">{FS_BANNER[lang]}</p>
+          <button
+            onClick={dismissBanner}
+            className="text-zinc-600 hover:text-zinc-400 text-sm shrink-0 leading-none mt-0.5"
+            aria-label="Dismiss"
+          >✕</button>
+        </div>
+      )}
 
       {/* Section switcher */}
       <div className="flex gap-1 mb-6 bg-zinc-900 border border-zinc-800 rounded-xl p-1">

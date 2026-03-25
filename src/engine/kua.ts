@@ -107,13 +107,14 @@ export const DIRECTION_SYMBOLS: Record<Direction, string> = {
   S: '↓', SW: '↙', W: '←', NW: '↖',
 }
 
-export const ENERGY_LABELS: Record<EnergyType, { chinese: string; name: Record<Language, string>; desc: Record<Language, string> }> = {
+export const ENERGY_LABELS: Record<EnergyType, { chinese: string; name: Record<Language, string>; desc: Record<Language, string>; tip: Record<Language, string> }> = {
   shengqi: {
     chinese: '生气',
     name: { bg: 'Шън Ци',    ru: 'Шэн Ци',   en: 'Sheng Qi'  },
     desc: { bg: 'Vitality — най-силната посока. Пари, успех, здраве.',
             ru: 'Vitality — сильнейшее направление. Деньги, успех, здоровье.',
             en: 'Vitality — your strongest direction. Wealth, success, growth.' },
+    tip:  { bg: 'Спи или работи с глава натам.',  ru: 'Спите или работайте головой туда.',  en: 'Sleep or work facing this.' },
   },
   tianyi: {
     chinese: '天医',
@@ -121,6 +122,7 @@ export const ENERGY_LABELS: Record<EnergyType, { chinese: string; name: Record<L
     desc: { bg: 'Небесен лекар — здраве, хармония, ментална яснота.',
             ru: 'Небесный врач — здоровье, гармония, ясность ума.',
             en: 'Heavenly Doctor — health, harmony, mental clarity.' },
+    tip:  { bg: 'Лекувай се или медитирай тук.',  ru: 'Лечитесь или медитируйте здесь.',    en: 'Heal or meditate here.'    },
   },
   yannian: {
     chinese: '延年',
@@ -128,6 +130,7 @@ export const ENERGY_LABELS: Record<EnergyType, { chinese: string; name: Record<L
     desc: { bg: 'Дълголетие — отношения, романтика, сключване на договори.',
             ru: 'Долголетие — отношения, романтика, заключение договоров.',
             en: 'Longevity — relationships, romance, making agreements.' },
+    tip:  { bg: 'Срещай се и преговаряй тук.',    ru: 'Встречайтесь и договаривайтесь.',    en: 'Meet or negotiate here.'   },
   },
   fuwei: {
     chinese: '伏位',
@@ -135,6 +138,7 @@ export const ENERGY_LABELS: Record<EnergyType, { chinese: string; name: Record<L
     desc: { bg: 'Стабилност — лично развитие, медитация, обучение.',
             ru: 'Стабильность — личное развитие, медитация, учёба.',
             en: 'Stability — personal development, meditation, learning.' },
+    tip:  { bg: 'Учи или се развивай тук.',       ru: 'Учитесь или развивайтесь здесь.',    en: 'Study or develop yourself.'},
   },
   huohai: {
     chinese: '祸害',
@@ -142,6 +146,7 @@ export const ENERGY_LABELS: Record<EnergyType, { chinese: string; name: Record<L
     desc: { bg: 'Неприятности — малки аргументи, загуба на пари.',
             ru: 'Неприятности — мелкие конфликты, потеря денег.',
             en: 'Mishap — minor arguments, small money losses.' },
+    tip:  { bg: 'Избягвай важни начинания тук.',  ru: 'Избегайте важных дел здесь.',        en: 'Avoid important tasks here.'},
   },
   wugui: {
     chinese: '五鬼',
@@ -149,6 +154,7 @@ export const ENERGY_LABELS: Record<EnergyType, { chinese: string; name: Record<L
     desc: { bg: 'Пет духа — предателство, кражба, неочаквани загуби.',
             ru: 'Пять духов — предательство, воровство, неожиданные потери.',
             en: 'Five Ghosts — betrayal, theft, unexpected setbacks.' },
+    tip:  { bg: 'Не спи с глава натам.',          ru: 'Не спите головой в эту сторону.',    en: 'Don\'t sleep facing this.' },
   },
   liusha: {
     chinese: '六煞',
@@ -156,6 +162,7 @@ export const ENERGY_LABELS: Record<EnergyType, { chinese: string; name: Record<L
     desc: { bg: 'Шест убийци — сексуални скандали, прогресивни загуби.',
             ru: 'Шесть убийств — скандалы, постепенные потери.',
             en: 'Six Killings — scandals, gradual erosion of luck.' },
+    tip:  { bg: 'Пази финанси и репутация тук.',  ru: 'Берегите финансы и репутацию.',      en: 'Guard finances, reputation.'},
   },
   jueming: {
     chinese: '绝命',
@@ -163,6 +170,7 @@ export const ENERGY_LABELS: Record<EnergyType, { chinese: string; name: Record<L
     desc: { bg: 'Заплаха за живота — най-лошата посока. Избягвай при важни решения.',
             ru: 'Угроза жизни — худшее направление. Избегай при важных решениях.',
             en: 'Life Threat — worst direction. Avoid for major decisions.' },
+    tip:  { bg: 'Избягвай тази посока напълно.',  ru: 'Избегайте этого направления.',       en: 'Avoid this direction fully.'},
   },
 }
 

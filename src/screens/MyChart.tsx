@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import PillarCard from '../components/PillarCard'
+import GuideElement from '../components/GuideElement'
 import { calculateChart } from '../engine/baziCalculator'
 import { t, STEMS, BRANCHES } from '../engine/translations'
+import { STEM_GUIDE, BRANCH_GUIDE } from '../data/guideContent'
 import type { Language, UserProfile, LuckCycle } from '../engine/types'
 
 const GAN = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸']
@@ -66,6 +68,8 @@ function LifeYearsGrid({ birthYear, lang }: { birthYear: number; lang: Language 
 interface Props {
   profile: UserProfile
   lang: Language
+  guideMode?: boolean
+  onGuideOpen?: (entry: import('../data/guideContent').GuideEntry) => void
 }
 
 const TIMELINE_SPAN = 90  // years shown on timeline
@@ -191,7 +195,7 @@ function LuckTimeline({ cycles, birthYear, lang }: {
   )
 }
 
-export default function MyChart({ profile, lang }: Props) {
+export default function MyChart({ profile, lang, guideMode = false, onGuideOpen }: Props) {
   const chart = useMemo(() =>
     calculateChart(profile.birthYear, profile.birthMonth, profile.birthDay,
       profile.birthHour, profile.birthMinute, profile.gender, lang),
@@ -230,16 +234,23 @@ export default function MyChart({ profile, lang }: Props) {
       </section>
 
       {/* Day Master */}
-      <section className="mb-6 bz-card p-4">
-        <p className="bz-label mb-3">{t('dayMaster', lang)}</p>
-        <div className="flex items-center gap-4">
-          <span className={`chinese text-5xl element-${chart.dayMaster.elementKey} leading-none`}>{chart.dayMaster.gan}</span>
-          <div>
-            <p className="text-zinc-100 font-semibold">{chart.dayMaster.element} {chart.dayMaster.polarity}</p>
-            <p className="text-zinc-500 text-sm mt-0.5">{t('zodiac', lang)}: {chart.zodiac}</p>
+      <GuideElement
+        guideMode={guideMode}
+        entry={STEM_GUIDE[chart.dayMaster.gan] ?? STEM_GUIDE['甲']}
+        onOpen={onGuideOpen ?? (() => {})}
+        className="mb-6"
+      >
+        <section className="bz-card p-4">
+          <p className="bz-label mb-3">{t('dayMaster', lang)}</p>
+          <div className="flex items-center gap-4">
+            <span className={`chinese text-5xl element-${chart.dayMaster.elementKey} leading-none`}>{chart.dayMaster.gan}</span>
+            <div>
+              <p className="text-zinc-100 font-semibold">{chart.dayMaster.element} {chart.dayMaster.polarity}</p>
+              <p className="text-zinc-500 text-sm mt-0.5">{t('zodiac', lang)}: {chart.zodiac}</p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </GuideElement>
 
       {/* 10-Year Luck Cycles — visual timeline */}
       {chart.luckCycles.length > 0 && (

@@ -96,9 +96,11 @@ function LifeAreasDashboard({ areas, lang, selectedArea, setSelectedArea }: {
 interface Props {
   profile: UserProfile
   lang: Language
+  guideMode?: boolean
+  onGuideOpen?: (entry: import('../data/guideContent').GuideEntry) => void
 }
 
-export default function Today({ profile, lang }: Props) {
+export default function Today({ profile, lang, guideMode: _guideMode, onGuideOpen: _onGuideOpen }: Props) {
   const [chart] = useState<BaziChart>(() =>
     calculateChart(
       profile.birthYear, profile.birthMonth, profile.birthDay,

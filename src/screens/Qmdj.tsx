@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   generateQmdjChart,
   GATE_INFO,
@@ -34,9 +34,16 @@ function categoryColor(cat: string) {
 
 // ─── Palace Grid Cell ─────────────────────────────────────────────────────────
 
-function PalaceCell({ p, layer, onClick, isSelected }: {
+const CATEGORY_ICON_QMDJ: Record<string, string> = {
+  auspicious:   '✅',
+  neutral:      '⚡',
+  inauspicious: '❌',
+}
+
+function PalaceCell({ p, layer, lang, onClick, isSelected }: {
   p: PalaceData
   layer: Layer
+  lang: Language
   onClick: () => void
   isSelected: boolean
 }) {
@@ -56,15 +63,18 @@ function PalaceCell({ p, layer, onClick, isSelected }: {
       <span className="text-[9px] text-zinc-500 leading-none">{dir} {DIR_SYMBOL[dir]}</span>
 
       {(layer === 'all' || layer === 'gates') && (
-        <span className={`text-base font-bold leading-none ${c.text}`}>{gate.chinese}</span>
+        <>
+          <span className={`text-[10px] font-bold leading-none ${c.text}`}>{gate.name[lang]}</span>
+          <span className={`text-[8px] opacity-50 leading-none ${c.text}`}>{gate.chinese}</span>
+          <span className="text-[9px] leading-none">{CATEGORY_ICON_QMDJ[gate.category]}</span>
+        </>
       )}
       {(layer === 'all' || layer === 'stars') && (
-        <span className="text-[9px] text-zinc-400 leading-none">{star.chinese}</span>
+        <span className="text-[8px] text-zinc-400 leading-none">{star.chinese}</span>
       )}
       {(layer === 'all' || layer === 'deities') && (
-        <span className="text-[9px] text-zinc-500 leading-none">{deity.chinese}</span>
+        <span className="text-[8px] text-zinc-500 leading-none">{deity.chinese}</span>
       )}
-      <span className="text-[8px] text-zinc-600 leading-none">{p.palace}</span>
     </button>
   )
 }
@@ -135,12 +145,30 @@ function PalaceDetail({ p, lang }: { p: PalaceData; lang: Language }) {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-interface Props { lang: Language }
+interface Props {
+  lang: Language
+  guideMode?: boolean
+  onGuideOpen?: (entry: import('../data/guideContent').GuideEntry) => void
+}
 
-export default function Qmdj({ lang }: Props) {
+const QMDJ_BANNER_KEY = 'qmdj_banner_dismissed'
+
+const QMDJ_BANNER: Record<Language, string> = {
+  bg: 'КМДЖ показва активните енергии сега. Изберете дворец със зелена ✅ врата и се насочете натам за важни действия.',
+  ru: 'ЦМДЦ показывает активные энергии прямо сейчас. Выберите дворец с зелёной ✅ вратой и направляйтесь туда для важных дел.',
+  en: 'QMDJ shows the active energies right now. Choose a palace with a ✅ gate and head that direction for important actions.',
+}
+
+export default function Qmdj({ lang, guideMode: _guideMode, onGuideOpen: _onGuideOpen }: Props) {
   const chart = useMemo(() => generateQmdjChart(new Date()), [])
   const [selectedPalace, setSelectedPalace] = useState<Palace | null>(null)
   const [layer, setLayer] = useState<Layer>('all')
+  const [bannerDismissed, setBannerDismissed] = useState(() => !!localStorage.getItem(QMDJ_BANNER_KEY))
+
+  function dismissBanner() {
+    localStorage.setItem(QMDJ_BANNER_KEY, '1')
+    setBannerDismissed(true)
+  }
 
   const selectedData = chart.palaces.find(p => p.palace === selectedPalace) ?? null
 
@@ -179,6 +207,19 @@ export default function Qmdj({ lang }: Props) {
         <p className="text-zinc-500 text-sm mt-0.5">{dateStr}</p>
       </div>
 
+      {/* Intro banner */}
+      {!bannerDismissed && (
+        <div className="mb-4 rounded-xl border border-sky-500/25 bg-sky-500/8 px-4 py-3 flex items-start gap-3">
+          <span className="text-lg shrink-0">🔯</span>
+          <p className="text-xs text-sky-300 leading-snug flex-1">{QMDJ_BANNER[lang]}</p>
+          <button
+            onClick={dismissBanner}
+            className="text-zinc-600 hover:text-zinc-400 text-sm shrink-0 leading-none mt-0.5"
+            aria-label="Dismiss"
+          >✕</button>
+        </div>
+      )}
+
       {/* Ju + polarity card */}
       <div className="mb-5 rounded-xl border border-zinc-800 bg-zinc-900 p-4 flex items-center gap-4">
         <div className="w-16 h-16 rounded-xl bg-zinc-800 border border-zinc-700 flex flex-col items-center justify-center shrink-0">
@@ -191,10 +232,23 @@ export default function Qmdj({ lang }: Props) {
           </p>
           <p className="text-base font-semibold text-zinc-100">{POLARITY_LABEL[chart.polarity][lang]}</p>
           {bestPalace && (
-            <p className="text-xs text-amber-400 mt-1">
-              💡 {lang === 'bg' ? `Най-добра посока: ${PALACE_DIR[bestPalace.palace]} · врата ${GATE_INFO[bestPalace.gate].chinese}` :
-                  lang === 'ru' ? `Лучшее направление: ${PALACE_DIR[bestPalace.palace]} · врата ${GATE_INFO[bestPalace.gate].chinese}` :
-                                  `Best direction: ${PALACE_DIR[bestPalace.palace]} · gate ${GATE_INFO[bestPalace.gate].chinese}`}
+            <p className="text-xs text-amber-300 mt-1 leading-snug">
+              {(() => {
+                const gate = GATE_INFO[bestPalace.gate]
+                const dir  = PALACE_DIR[bestPalace.palace]
+                const action: Record<string, Record<Language, string>> = {
+                  open:    { bg: 'Отвори врата или прозорец.', ru: 'Откройте дверь или окно.',    en: 'Open a door or window.'          },
+                  rest:    { bg: 'Почивай в тази посока.',     ru: 'Отдыхайте в этом направлении.', en: 'Rest facing this direction.'    },
+                  life:    { bg: 'Стартирай нещо ново.',       ru: 'Начните что-то новое.',          en: 'Start something new.'           },
+                  default: { bg: 'Действай в тази посока.',    ru: 'Двигайтесь в этом направлении.', en: 'Move in this direction.'        },
+                }
+                const tip = (action[bestPalace.gate] ?? action.default)[lang]
+                return lang === 'bg'
+                  ? `💡 Днес най-добрата посока е ${dir} (${gate.name[lang]}). ${tip}`
+                  : lang === 'ru'
+                  ? `💡 Сегодня лучшее направление — ${dir} (${gate.name[lang]}). ${tip}`
+                  : `💡 Today's best direction: ${dir} (${gate.name[lang]}). ${tip}`
+              })()}
             </p>
           )}
         </div>
@@ -226,6 +280,7 @@ export default function Qmdj({ lang }: Props) {
               key={palace}
               p={p}
               layer={layer}
+              lang={lang}
               onClick={() => setSelectedPalace(selectedPalace === palace ? null : palace)}
               isSelected={selectedPalace === palace}
             />

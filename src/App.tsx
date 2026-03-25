@@ -22,6 +22,8 @@ import { loadAuth, loadProfile, saveProfile, saveLang, loadLang, clearAll, loadS
 import { useDailyReminder } from './utils/dailyReminder'
 import { calculateChart } from './engine/baziCalculator'
 import type { Language, Theme, Tier, UserProfile } from './engine/types'
+import type { GuideEntry } from './data/guideContent'
+import GuideModal from './components/GuideModal'
 
 type AppState = 'lang' | 'passphrase' | 'setup' | 'admin' | 'app'
 
@@ -43,6 +45,8 @@ export default function App() {
   const [tabKey, setTabKey] = useState(0)  // increments on same-tab re-click to force re-mount
   const [collapsed, setCollapsed] = useState(() => loadSidebarCollapsed())
   const [activePersonId, setActivePersonId] = useState<string | null>(null)
+  const [guideMode, setGuideMode] = useState(false)
+  const [guideEntry, setGuideEntry] = useState<GuideEntry | null>(null)
   const tier = loadAuth()?.tier as Tier | undefined
 
   function handleTabSelect(newTab: Tab) {
@@ -193,12 +197,32 @@ export default function App() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--page-bg)' }}>
-      {/* Global token badge */}
-      {auth && tab !== 'today' && (
-        <div className={`fixed top-3 right-4 z-50 transition-all duration-300`}>
-          <TokenBadge balance={auth.balance} tier={auth.tier} resetDate={auth.resetDate} lang={lang} />
-        </div>
+      {/* Guide mode modal */}
+      {guideEntry && (
+        <GuideModal
+          entry={guideEntry}
+          lang={lang}
+          onClose={() => setGuideEntry(null)}
+        />
       )}
+
+      {/* Global token badge + guide toggle */}
+      <div className={`fixed top-3 right-4 z-50 flex items-center gap-2 transition-all duration-300`}>
+        <button
+          onClick={() => setGuideMode(m => !m)}
+          title={guideMode
+            ? (lang === 'ru' ? 'Выйти из режима гида' : lang === 'bg' ? 'Изход от режим гид' : 'Exit guide mode')
+            : (lang === 'ru' ? 'Режим гида' : lang === 'bg' ? 'Режим гид' : 'Guide mode')}
+          className={`w-7 h-7 rounded-full border text-sm font-bold transition-colors ${
+            guideMode
+              ? 'bg-amber-500/25 border-amber-500/60 text-amber-400 animate-pulse'
+              : 'bg-zinc-800/80 border-zinc-700/60 text-zinc-400 hover:text-zinc-200'
+          }`}
+        >?</button>
+        {auth && tab !== 'today' && (
+          <TokenBadge balance={auth.balance} tier={auth.tier} resetDate={auth.resetDate} lang={lang} />
+        )}
+      </div>
 
       <div className={`${sidebarWidth} transition-all duration-300`}>
         {/* Active person banner */}
@@ -216,8 +240,8 @@ export default function App() {
           </div>
         )}
 
-        {tab === 'today'       && (needsProfile ? setupPrompt : <Today profile={effectiveProfile!} lang={lang} />)}
-        {tab === 'chart'       && (needsProfile ? setupPrompt : <MyChart profile={effectiveProfile!} lang={lang} />)}
+        {tab === 'today'       && (needsProfile ? setupPrompt : <Today profile={effectiveProfile!} lang={lang} guideMode={guideMode} onGuideOpen={setGuideEntry} />)}
+        {tab === 'chart'       && (needsProfile ? setupPrompt : <MyChart profile={effectiveProfile!} lang={lang} guideMode={guideMode} onGuideOpen={setGuideEntry} />)}
         {tab === 'activations' && (
           !isPaidTier
             ? <LockedFeature feature="activations" lang={lang} onUpgrade={handleUpgrade} />
@@ -226,12 +250,12 @@ export default function App() {
         {tab === 'fengshui'    && (
           !isPaidTier
             ? <LockedFeature feature="fengshui" lang={lang} onUpgrade={handleUpgrade} />
-            : needsProfile ? setupPrompt : <FengShui profile={effectiveProfile!} lang={lang} />
+            : needsProfile ? setupPrompt : <FengShui profile={effectiveProfile!} lang={lang} guideMode={guideMode} onGuideOpen={setGuideEntry} />
         )}
         {tab === 'qmdj'        && (
           !isPaidTier
             ? <LockedFeature feature="qmdj" lang={lang} onUpgrade={handleUpgrade} />
-            : <Qmdj lang={lang} />
+            : <Qmdj lang={lang} guideMode={guideMode} onGuideOpen={setGuideEntry} />
         )}
         {tab === 'ask'         && (needsProfile ? setupPrompt : (chart && (
           <AskBazi
