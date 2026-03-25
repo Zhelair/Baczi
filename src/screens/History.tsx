@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Clock, Trash2, Download, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Clock, Trash2, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { loadHistory, deleteHistoryEntry, clearHistoryByTool, type HistoryEntry, type HistoryTool } from '../utils/storage'
 import type { Language } from '../engine/types'
 
@@ -93,14 +93,6 @@ export default function History({ lang }: Props) {
         <div className="flex items-center gap-2 flex-shrink-0 pt-1">
           {entries.length > 0 && (
             <>
-              <button
-                onClick={downloadAll}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 text-sm transition-colors"
-                title={lang === 'bg' ? 'Изтегли всичко' : lang === 'ru' ? 'Скачать всё' : 'Download all'}
-              >
-                <Download size={14} />
-                {lang === 'bg' ? 'Изтегли' : lang === 'ru' ? 'Скачать' : 'Download'}
-              </button>
               {confirmClear === 'all' ? (
                 <div className="flex items-center gap-1">
                   <button onClick={() => clearTool('all')} className="px-3 py-2 rounded-xl bg-red-500/20 text-red-400 border border-red-700/50 text-xs font-medium transition-colors hover:bg-red-500/30">
@@ -172,13 +164,6 @@ export default function History({ lang }: Props) {
                   <p className="text-xs text-zinc-600">{formatDate(entry.date, lang)}</p>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
-                    onClick={() => downloadEntry(entry)}
-                    className="p-1.5 text-zinc-600 hover:text-zinc-300 transition-colors"
-                    title={lang === 'bg' ? 'Изтегли' : lang === 'ru' ? 'Скачать' : 'Download'}
-                  >
-                    <Download size={13} />
-                  </button>
                   <button
                     onClick={() => remove(entry.id)}
                     className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors"

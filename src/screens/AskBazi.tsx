@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Sparkles, History, Download, Trash2, FolderOpen, X, Save, Upload, Volume2, VolumeX, Mic, MicOff, BookmarkPlus, Check } from 'lucide-react'
+import { Send, Sparkles, History, Download, Trash2, FolderOpen, X, Save, Upload, Volume2, VolumeX, Mic, MicOff, BookmarkPlus, Check, Paperclip } from 'lucide-react'
 import { loadAuth, saveAuth as _saveAuth, loadChatSessions, saveChatSessions, loadNotes, saveNotes, addHistoryEntry, updateHistoryEntry, type ChatSession, type LearningNote } from '../utils/storage'
 import { speak, stopSpeaking, ttsAvailable, startSTT, sttAvailable, stripMarkdown, type STTHandle } from '../utils/tts'
 import { LEARNING_TOPICS } from '../data/learningTopics'
@@ -79,8 +79,11 @@ export default function AskBazi({ chart, lang, studyContext, onNavigateToNotes }
   const [saveNoteTopic, setSaveNoteTopic] = useState('general')
   const [saveNoteContent, setSaveNoteContent] = useState('')
   const [savedNoteIdx, setSavedNoteIdx] = useState<number | null>(null) // flash confirmation
+  const [attachedFile, setAttachedFile] = useState<{ name: string; text: string } | null>(null)
+  const [fileLoading, setFileLoading] = useState(false)
   const sttRef = useRef<STTHandle | null>(null)
   const importRef = useRef<HTMLInputElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const studySentRef = useRef(false)
   const historyIdRef = useRef<string | null>(null)
@@ -232,11 +235,50 @@ export default function AskBazi({ chart, lang, studyContext, onNavigateToNotes }
     e.target.value = ''
   }
 
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setFileLoading(true)
+    try {
+      if (file.name.endsWith('.pdf')) {
+        // Upload to backend for text extraction
+        const arrayBuffer = await file.arrayBuffer()
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+        const res = await fetch('/api/extract-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ base64, name: file.name }),
+        })
+        const data = await res.json() as { text?: string; error?: string }
+        if (!res.ok || !data.text) throw new Error(data.error ?? 'Parse failed')
+        setAttachedFile({ name: file.name, text: data.text })
+      } else {
+        // .txt or .md — read directly
+        const text = await file.text()
+        setAttachedFile({ name: file.name, text: text.slice(0, 8000) })
+      }
+    } catch {
+      setError(lang === 'bg' ? 'Грешка при четене на файла' : lang === 'ru' ? 'Ошибка чтения файла' : 'Error reading file')
+    } finally {
+      setFileLoading(false)
+    }
+  }
+
   async function send(text?: string) {
-    const content = (text ?? input).trim()
-    if (!content || loading) return
+    const userText = (text ?? input).trim()
+    if ((!userText && !attachedFile) || loading) return
     setInput('')
     setError('')
+
+    // Prepend attached file content as context
+    const defaultQuestion = lang === 'bg' ? 'Анализирай това съдържание в контекста на моята карта.'
+      : lang === 'ru' ? 'Проанализируй это содержание в контексте моей карты.'
+      : 'Analyse this content in the context of my chart.'
+    const content = attachedFile
+      ? `[📎 ${attachedFile.name}]\n\n${attachedFile.text}\n\n---\n\n${userText || defaultQuestion}`
+      : userText
+    if (attachedFile) setAttachedFile(null)
 
     const newMessages: Message[] = [...messages, { role: 'user', content }]
     setMessages(newMessages)
@@ -624,7 +666,27 @@ export default function AskBazi({ chart, lang, studyContext, onNavigateToNotes }
             </button>
           </div>
         )}
-        <div className={`flex gap-2 items-end border rounded-2xl px-4 py-2 transition-colors ${isRecording ? 'border-red-500/60' : 'border-[var(--card-border)] focus-within:border-amber-500/50'}`} style={{ background: 'var(--card-bg)', boxShadow: 'var(--card-shadow)' }}>
+        {/* Attached file badge */}
+        {attachedFile && (
+          <div className="flex items-center gap-2 mb-1.5 px-1">
+            <span className="text-xs text-amber-400 flex items-center gap-1">
+              📎 {attachedFile.name}
+              <span className="text-zinc-600">({Math.round(attachedFile.text.length / 100) / 10}k chars)</span>
+            </span>
+            <button onClick={() => setAttachedFile(null)} className="text-zinc-600 hover:text-red-400 transition-colors">
+              <X size={12} />
+            </button>
+          </div>
+        )}
+        {/* Hidden file input */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".txt,.md,.pdf"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+        <div className={`flex gap-2 items-end border rounded-2xl px-4 py-2 transition-colors ${isRecording ? 'border-red-500/60' : attachedFile ? 'border-amber-500/40' : 'border-[var(--card-border)] focus-within:border-amber-500/50'}`} style={{ background: 'var(--card-bg)', boxShadow: 'var(--card-shadow)' }}>
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
@@ -638,6 +700,21 @@ export default function AskBazi({ chart, lang, studyContext, onNavigateToNotes }
             className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 resize-none focus:outline-none disabled:opacity-50 max-h-28 py-1"
             style={{ fieldSizing: 'content' } as React.CSSProperties}
           />
+          {/* Attach file button */}
+          {!loading && !isRecording && (
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={fileLoading}
+              className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-colors mb-0.5 ${
+                attachedFile
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200'
+              }`}
+              title={lang === 'bg' ? 'Прикачи файл (.txt, .md, .pdf)' : lang === 'ru' ? 'Прикрепить файл (.txt, .md, .pdf)' : 'Attach file (.txt, .md, .pdf)'}
+            >
+              {fileLoading ? <span className="text-[10px] animate-pulse">…</span> : <Paperclip size={14} />}
+            </button>
+          )}
           {/* Mic button — STT */}
           {sttAvailable && !loading && (
             <button
@@ -657,7 +734,7 @@ export default function AskBazi({ chart, lang, studyContext, onNavigateToNotes }
           )}
           <button
             onClick={() => send()}
-            disabled={!input.trim() || loading || isRecording}
+            disabled={(!input.trim() && !attachedFile) || loading || isRecording}
             className="bz-btn bz-btn-primary flex-shrink-0 w-9 h-9 rounded-xl p-0 mb-0.5"
           >
             <Send size={14} className="text-black" />
