@@ -159,7 +159,7 @@ const QMDJ_BANNER: Record<Language, string> = {
   en: 'QMDJ shows the active energies right now. Choose a palace with a ✅ gate and head that direction for important actions.',
 }
 
-export default function Qmdj({ lang, guideMode: _guideMode, onGuideOpen: _onGuideOpen }: Props) {
+export default function Qmdj({ lang, guideMode = false, onGuideOpen: _onGuideOpen }: Props) {
   const chart = useMemo(() => generateQmdjChart(new Date()), [])
   const [selectedPalace, setSelectedPalace] = useState<Palace | null>(null)
   const [layer, setLayer] = useState<Layer>('all')
@@ -208,7 +208,7 @@ export default function Qmdj({ lang, guideMode: _guideMode, onGuideOpen: _onGuid
       </div>
 
       {/* Intro banner */}
-      {!bannerDismissed && (
+      {(guideMode || !bannerDismissed) && (
         <div className="mb-4 rounded-xl border border-sky-500/25 bg-sky-500/8 px-4 py-3 flex items-start gap-3">
           <span className="text-lg shrink-0">🔯</span>
           <p className="text-xs text-sky-300 leading-snug flex-1">{QMDJ_BANNER[lang]}</p>

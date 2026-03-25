@@ -214,7 +214,7 @@ function KuaSection({ profile, lang }: { profile: UserProfile; lang: Language })
           </div>
           <div>
             <p className="text-xs uppercase tracking-wider text-zinc-500 mb-1">
-              {lang === 'bg' ? 'Куа номер' : lang === 'ru' ? 'Куа номер' : 'Kua Number'}
+              {lang === 'bg' ? 'Куа номер' : lang === 'ru' ? 'Гуа номер' : 'Kua Number'}
             </p>
             <p className={`text-2xl font-semibold ${elemColorClass}`}>{result.element[lang]}</p>
             <p className="text-sm text-zinc-400 mt-1">{groupLabel}</p>
@@ -272,9 +272,43 @@ function KuaSection({ profile, lang }: { profile: UserProfile; lang: Language })
         {lang === 'bg'
           ? 'Системата 8 Мансиони (八宅) е базирана на годината на раждане и пола. Куа 5 се свежда до 2 (мъже) / 8 (жени).'
           : lang === 'ru'
-          ? 'Система 8 дворцов (八宅) основана на годе рождения и поле. Куа 5 приводится к 2 (мужчины) / 8 (женщины).'
+          ? 'Система 8 дворцов (八宅) основана на годе рождения и поле. Гуа 5 приводится к 2 (мужчины) / 8 (женщины).'
           : '8 Mansions (八宅) is based on birth year and gender. Kua 5 resolves to 2 (males) / 8 (females).'}
       </p>
+
+      {/* How-to guide */}
+      <div className="mt-5 rounded-xl border border-teal-500/25 bg-teal-500/8 px-4 py-4">
+        <p className="text-xs font-semibold text-teal-400 mb-2">
+          {lang === 'bg' ? '🧭 Как да използвам компаса?' : lang === 'ru' ? '🧭 Как пользоваться компасом?' : '🧭 How to use the compass?'}
+        </p>
+        <ol className="list-decimal list-inside space-y-1.5 text-xs text-zinc-400 leading-snug">
+          {lang === 'bg' ? (
+            <>
+              <li>Застани на входа на жилището си, гледай навън — това е <span className="text-zinc-200">посоката на входа</span>.</li>
+              <li>Използвай телефонния компас, за да намериш нейната посока (С, ЮИ, З…).</li>
+              <li>Намери тази посока в компаса горе — цветът й показва дали е благоприятна за теб.</li>
+              <li>За анализ на стаи: стой в центъра на стаята, гледай към всяка стена — намери й посоката и виж енергията й.</li>
+              <li>Имаш план на жилището? Прати го в чата 💬 заедно с посоката на входа — ще направим пълен анализ по сектори.</li>
+            </>
+          ) : lang === 'ru' ? (
+            <>
+              <li>Встань у входной двери, смотри наружу — это <span className="text-zinc-200">направление выхода</span>.</li>
+              <li>Используй компас телефона, чтобы определить сторону света (С, ЮВ, З…).</li>
+              <li>Найди это направление на компасе выше — его цвет покажет, благоприятно ли оно для тебя.</li>
+              <li>Для анализа комнат: встань в центре комнаты, смотри на каждую стену — найди направление и посмотри его энергию.</li>
+              <li>Есть план квартиры? Отправь его в чат 💬 с указанием стороны входа — сделаем полный анализ по секторам.</li>
+            </>
+          ) : (
+            <>
+              <li>Stand at the front door facing out — that is the <span className="text-zinc-200">facing direction</span>.</li>
+              <li>Use your phone compass to identify the cardinal direction (N, SE, W…).</li>
+              <li>Find that direction on the compass above — its color shows whether it's auspicious for you.</li>
+              <li>For room analysis: stand in the room's centre, face each wall, find its direction and check its energy.</li>
+              <li>Have a floor plan? Send it in the chat 💬 with the entrance direction — we'll do a full sector-by-sector analysis.</li>
+            </>
+          )}
+        </ol>
+      </div>
     </>
   )
 }
@@ -633,7 +667,7 @@ const FS_BANNER: Record<Language, string> = {
   en: 'The compass shows your personal Feng Shui directions. Green = strong energy. Use them for sleeping, working, and meetings.',
 }
 
-export default function FengShui({ profile, lang, guideMode: _guideMode, onGuideOpen: _onGuideOpen }: Props) {
+export default function FengShui({ profile, lang, guideMode = false, onGuideOpen: _onGuideOpen }: Props) {
   const [section, setSection] = useState<Section>('kua')
   const [bannerDismissed, setBannerDismissed] = useState(() => !!localStorage.getItem(FS_BANNER_KEY))
 
@@ -643,7 +677,7 @@ export default function FengShui({ profile, lang, guideMode: _guideMode, onGuide
   }
 
   const sectionTabs: { id: Section; label: Record<Language, string> }[] = [
-    { id: 'kua',    label: { bg: 'Куа',              ru: 'Куа',             en: 'Kua'           } },
+    { id: 'kua',    label: { bg: 'Куа',              ru: 'Гуа',             en: 'Kua'           } },
     { id: 'annual', label: { bg: 'Год. звезди',      ru: 'Год. звёзды',     en: 'Annual Stars'  } },
     { id: 'house',  label: { bg: 'Натал. карта',     ru: 'Натал. карта',    en: 'House Chart'   } },
   ]
@@ -659,7 +693,7 @@ export default function FengShui({ profile, lang, guideMode: _guideMode, onGuide
       </div>
 
       {/* Intro banner */}
-      {!bannerDismissed && (
+      {(guideMode || !bannerDismissed) && (
         <div className="mb-4 rounded-xl border border-teal-500/25 bg-teal-500/8 px-4 py-3 flex items-start gap-3">
           <span className="text-lg shrink-0">🧭</span>
           <p className="text-xs text-teal-300 leading-snug flex-1">{FS_BANNER[lang]}</p>
