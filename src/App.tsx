@@ -225,6 +225,27 @@ export default function App() {
       </div>
 
       <div className={`${sidebarWidth} transition-all duration-300`}>
+        {/* Guide mode banner — shown on all tabs when ? is active */}
+        {guideMode && (() => {
+          const tips: Partial<Record<Tab, Record<Language, string>>> = {
+            today:       { bg: '☀️ Днес: Виждаш дневните енергии и личното си четене. Кликни на стълбовете за тяхното значение.', ru: '☀️ Сегодня: здесь дневные энергии и личное чтение. Нажимай на столпы, чтобы узнать их значение.', en: '☀️ Today: daily energies and personal reading. Tap pillars to learn their meaning.' },
+            chart:       { bg: '📖 Карта: Четирите стълба показват твоята BaZi карта. Натисни Господаря на деня — ще видиш обяснение.', ru: '📖 Карта: Четыре столпа — твоя карта Ба-Цзы. Нажми на Хозяина дня, чтобы увидеть объяснение.', en: '📖 Chart: Four Pillars show your BaZi. Tap Day Master to see its guide explanation.' },
+            activations: { bg: '⚡ Активации: Виждаш как текущите енергии влияят на твоята карта. Кликни на всеки елемент за подробности.', ru: '⚡ Активации: текущие энергии влияют на твою карту. Нажимай на элементы для деталей.', en: '⚡ Activations: current energies vs your chart. Tap elements for details.' },
+            fengshui:    { bg: '🧭 Фън Шуй: Куа → личните посоки. Натал. карта → сектори на жилището. Виж раздела "Как да го ползвам" долу.', ru: '🧭 Фэн Шуй: Гуа → личные направления. Натал. карта → секторы жилища. Смотри раздел "Как использовать" ниже.', en: '🧭 Feng Shui: Kua → personal directions. House Chart → home sectors. See the "How to use" guide below.' },
+            qmdj:        { bg: '🔯 КМДЖ: Зелена ✅ врата = действай. Кликни на дворец за детайли. Насочи се физически в тази посока за важни действия.', ru: '🔯 ЦМДЦ: Зелёная ✅ врата = действуй. Нажми на дворец для деталей. Физически направляйся туда для важных дел.', en: '🔯 QMDJ: Green ✅ gate = act. Tap a palace for details. Physically move in that direction for important actions.' },
+            ask:         { bg: '💬 Спроси: Задавай въпроси за BaZi картата си. Можеш да прикачиш .txt, .md или .pdf файл за анализ.', ru: '💬 Спроси: задавай вопросы о своей карте Ба-Цзы. Можно прикрепить .txt, .md или .pdf для анализа.', en: '💬 Ask: chat about your BaZi chart. Attach .txt, .md, or .pdf files for analysis.' },
+            learn:       { bg: '📚 Обучение: Изучавай BaZi и Chinese Metaphysics. Може да запазиш бележки от чата тук.', ru: '📚 Обучение: изучай Ба-Цзы и китайскую метафизику. Заметки из чата сохраняются здесь.', en: '📚 Learning: study BaZi and Chinese Metaphysics. Chat notes are saved here.' },
+            lucky:       { bg: '🍀 Удача: Виждаш текущата дневна енергия и щастливите часове.', ru: '🍀 Удача: текущая дневная энергия и удачные часы.', en: '🍀 Lucky: current daily energy and your lucky hours.' },
+          }
+          const tip = tips[tab]
+          if (!tip) return null
+          return (
+            <div className="sticky top-0 z-40 flex items-start gap-2 px-4 py-2 bg-amber-500/10 border-b border-amber-500/20">
+              <p className="text-xs text-amber-300 leading-snug flex-1">{tip[lang]}</p>
+              <button onClick={() => setGuideMode(false)} className="text-zinc-600 hover:text-zinc-400 text-sm shrink-0 mt-0.5" aria-label="exit guide">✕</button>
+            </div>
+          )
+        })()}
         {/* Active person banner */}
         {activePerson && tab !== 'persons' && tab !== 'settings' && (
           <div className="sticky top-0 z-40 flex items-center justify-between px-4 py-2 bg-amber-500/10 border-b border-amber-500/20">
