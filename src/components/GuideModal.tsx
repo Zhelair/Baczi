@@ -23,7 +23,6 @@ export default function GuideModal({ entry, lang, onClose, onSaveNote }: Props) 
   return (
     <div
       className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
-      onClick={onClose}
     >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />

@@ -3,7 +3,7 @@ import PillarCard from '../components/PillarCard'
 import GuideElement from '../components/GuideElement'
 import { calculateChart } from '../engine/baziCalculator'
 import { t, STEMS, BRANCHES } from '../engine/translations'
-import { STEM_GUIDE, BRANCH_GUIDE } from '../data/guideContent'
+import { STEM_GUIDE } from '../data/guideContent'
 import type { Language, UserProfile, LuckCycle } from '../engine/types'
 
 const GAN = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸']
