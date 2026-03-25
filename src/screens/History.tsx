@@ -21,14 +21,6 @@ const TOOL_COLORS: Record<HistoryTool, string> = {
   study:  'bg-purple-500/10 text-purple-400 border-purple-500/20',
 }
 
-function downloadJson(data: unknown, filename: string) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
-}
-
 function formatDate(iso: string, lang: Language) {
   return new Date(iso).toLocaleDateString(
     lang === 'bg' ? 'bg-BG' : lang === 'ru' ? 'ru-RU' : 'en-US',
@@ -63,14 +55,6 @@ export default function History({ lang }: Props) {
     }
     setEntries(loadHistory())
     setConfirmClear(null)
-  }
-
-  function downloadAll() {
-    downloadJson(entries, `bazi-history-${new Date().toISOString().split('T')[0]}.json`)
-  }
-
-  function downloadEntry(entry: HistoryEntry) {
-    downloadJson(entry.data, `bazi-${entry.tool}-${entry.date}.json`)
   }
 
   const filtered = filter === 'all' ? entries : entries.filter(e => e.tool === filter)
