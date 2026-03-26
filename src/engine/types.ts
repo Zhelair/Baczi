@@ -1,5 +1,5 @@
 export type Language = 'bg' | 'ru' | 'en'
-export type Tier = 'free' | 'pro' | 'max' | 'admin'
+export type Tier = 'free' | 'pro' | 'max' | 'admin' | 'editor'
 export type Gender = 'male' | 'female'
 export type Theme = 'dark' | 'daylight' | 'neon'
 
@@ -108,4 +108,5 @@ export const MONTHLY_TOKENS: Record<Tier, number> = {
   pro: 2000,
   max: 10000,
   admin: 999999,
+  editor: 999999,
 }

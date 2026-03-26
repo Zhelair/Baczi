@@ -16,6 +16,7 @@ import History from './screens/History'
 import Persons from './screens/Persons'
 import AdminPanel from './screens/AdminPanel'
 import AdminDashboard from './screens/AdminDashboard'
+import Studio from './screens/Studio'
 import LockedFeature from './components/LockedFeature'
 import TabBar, { type Tab } from './components/TabBar'
 import { loadAuth, loadProfile, saveProfile, saveLang, loadLang, clearAll, loadSidebarCollapsed, saveSidebarCollapsed, loadPersons, type PersonProfile } from './utils/storage'
@@ -315,6 +316,9 @@ export default function App() {
               />
         )}
         {tab === 'admin' && tier === 'admin' && <AdminPanel />}
+        {tab === 'studio' && (tier === 'admin' || tier === 'editor') && (
+          <Studio lang={lang} persons={loadPersons()} chart={chart} />
+        )}
       </div>
 
       <TabBar

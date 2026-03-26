@@ -13,12 +13,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-type Tier = 'free' | 'pro' | 'max' | 'admin'
+type Tier = 'free' | 'pro' | 'max' | 'admin' | 'editor'
 
 const CHAT_COST = 15
 
 const MONTHLY_TOKENS: Record<Tier, number> = {
-  free: 500, pro: 2000, max: 10000, admin: 999999,
+  free: 500, pro: 2000, max: 10000, admin: 999999, editor: 999999,
 }
 
 const CHAR_TO_PINYIN: Record<string, string> = {
@@ -35,7 +35,7 @@ function nextMonthReset() {
 }
 
 async function deductTokens(hash: string, tier: Tier): Promise<{ ok: boolean; balance: number }> {
-  if (tier === 'admin') return { ok: true, balance: MONTHLY_TOKENS.admin }
+  if (tier === 'admin' || tier === 'editor') return { ok: true, balance: MONTHLY_TOKENS[tier] }
   const today = new Date().toISOString().split('T')[0]
   const { data } = await supabase
     .from('token_balances').select('balance, reset_date')
@@ -53,50 +53,66 @@ async function deductTokens(hash: string, tier: Tier): Promise<{ ok: boolean; ba
   return { ok: true, balance }
 }
 
+/**
+ * Parallel targeted knowledge fetch: fires multiple queries simultaneously,
+ * deduplicates, returns up to 18 rules for richer AI context.
+ */
 async function fetchKnowledge(chart: Record<string, unknown>): Promise<string> {
-  const tags = new Set<string>()
+  const pillarTags: string[][] = []
+
   for (const key of ['year', 'month', 'day', 'hour']) {
     const p = chart[key] as Record<string, string> | null | undefined
     if (!p) continue
-    if (p.gan && CHAR_TO_PINYIN[p.gan]) tags.add(CHAR_TO_PINYIN[p.gan])
-    if (p.zhi && CHAR_TO_PINYIN[p.zhi]) tags.add(CHAR_TO_PINYIN[p.zhi])
-  }
-  if (!tags.size) return ''
-
-  const tagArr = [...tags]
-
-  // Prefer joey_yap (fourpillars.ru) school first, top 4 rules
-  const { data: primary } = await supabase
-    .from('bazi_knowledge')
-    .select('rule_text')
-    .overlaps('tags', tagArr)
-    .eq('school', 'joey_yap')
-    .in('confidence', ['high', 'medium'])
-    .limit(4)
-
-  // Fill remaining slots from any school (excluding already found patterns)
-  const needed = 6 - (primary?.length ?? 0)
-  let extra: { rule_text: string }[] = []
-  if (needed > 0) {
-    const { data } = await supabase
-      .from('bazi_knowledge')
-      .select('rule_text')
-      .overlaps('tags', tagArr)
-      .neq('school', 'joey_yap')
-      .in('confidence', ['high', 'medium'])
-      .limit(needed)
-    extra = data ?? []
+    const tags: string[] = []
+    if (p.gan && CHAR_TO_PINYIN[p.gan]) tags.push(CHAR_TO_PINYIN[p.gan])
+    if (p.zhi && CHAR_TO_PINYIN[p.zhi]) tags.push(CHAR_TO_PINYIN[p.zhi])
+    if (tags.length) pillarTags.push(tags)
   }
 
-  const all = [...(primary ?? []), ...extra]
-  if (!all.length) return ''
-  return 'Relevant BaZi rules (Joey Yap school):\n' + all.map(r => `• ${r.rule_text}`).join('\n')
+  if (!pillarTags.length) return ''
+
+  const allTags = pillarTags.flat()
+  // Parallel queries: all-inclusive joey_yap, all-inclusive any school, day pillar specific, month context
+  const queries = [
+    supabase.from('bazi_knowledge').select('rule_text, pattern')
+      .overlaps('tags', allTags).eq('school', 'joey_yap').eq('confidence', 'high').limit(8),
+    supabase.from('bazi_knowledge').select('rule_text, pattern')
+      .overlaps('tags', allTags).in('confidence', ['high', 'medium']).limit(10),
+    pillarTags[2]
+      ? supabase.from('bazi_knowledge').select('rule_text, pattern')
+          .overlaps('tags', pillarTags[2]).in('confidence', ['high', 'medium']).limit(6)
+      : Promise.resolve({ data: [] }),
+    pillarTags[1]
+      ? supabase.from('bazi_knowledge').select('rule_text, pattern')
+          .overlaps('tags', pillarTags[1]).in('confidence', ['high', 'medium']).limit(4)
+      : Promise.resolve({ data: [] }),
+  ]
+
+  const results = await Promise.allSettled(queries)
+
+  const seen = new Set<string>()
+  const rules: string[] = []
+
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue
+    const rows = (result.value as { data: Array<{ rule_text: string; pattern?: string }> | null }).data ?? []
+    for (const row of rows) {
+      if (!seen.has(row.rule_text)) {
+        seen.add(row.rule_text)
+        rules.push(`• ${row.pattern ? row.pattern + ': ' : ''}${row.rule_text}`)
+        if (rules.length >= 18) break
+      }
+    }
+    if (rules.length >= 18) break
+  }
+
+  if (!rules.length) return ''
+  return `Relevant BaZi rules:\n${rules.join('\n')}`
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  // Auth
   const auth = req.headers.authorization
   if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing token' })
 
@@ -112,11 +128,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { messages, chart, language } = req.body ?? {}
   if (!messages?.length || !chart) return res.status(400).json({ error: 'Missing fields' })
 
-  // Deduct tokens
   const { ok, balance } = await deductTokens(payload.hash, payload.tier)
   if (!ok) return res.status(429).json({ error: 'Insufficient tokens', balance })
 
-  // Build system prompt with RAG
   const knowledge = await fetchKnowledge(chart as Record<string, unknown>)
   const lang = language === 'bg' ? 'Bulgarian' : language === 'ru' ? 'Russian' : 'English'
 
@@ -139,7 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         model: 'deepseek-chat',
         messages: [
           { role: 'system', content: systemPrompt },
-          ...messages.slice(-10), // keep last 10 messages for context
+          ...messages.slice(-10),
         ],
         temperature: 0.8,
         max_tokens: 600,

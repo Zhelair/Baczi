@@ -58,6 +58,35 @@ export interface BaziProject {
   topicProgress: Record<string, TopicStatus>
 }
 
+// ─── Studio (Editor mode) types ───────────────────────────────────────────────
+
+/** A single sub-chat thread inside a client's profile */
+export interface ClientSubChat {
+  id: string
+  name: string          // e.g. "BaZi", "Feng Shui", "Notes", or custom
+  isDefault: boolean    // default tabs can't be deleted
+  messages: { role: 'user' | 'assistant'; content: string }[]
+  updatedAt: string     // ISO date
+}
+
+/** A client profile in Studio mode (linked to PersonProfile by personId) */
+export interface StudioClient {
+  personId: string            // references PersonProfile.id
+  chats: ClientSubChat[]
+}
+
+/** A saved consultation draft */
+export interface ConsultationDraft {
+  id: string
+  personId: string
+  personName: string
+  topic: string               // e.g. "weekly", "fengshui", "qimen"
+  content: string             // generated/edited text
+  templateName: string
+  createdAt: string
+  updatedAt: string
+}
+
 const HISTORY_MAX = 100  // max entries total
 
 const KEYS = {
@@ -73,6 +102,8 @@ const KEYS = {
   TOPIC_PROGRESS:    'baczi_topic_progress',
   SIDEBAR_COLLAPSED: 'baczi_sidebar_collapsed',
   PERSONS:           'baczi_persons',
+  STUDIO_CLIENTS:    'baczi_studio_clients',
+  STUDIO_DRAFTS:     'baczi_studio_drafts',
 } as const
 
 export function saveAuth(auth: AuthState) {
@@ -271,4 +302,85 @@ export function importProject(project: BaziProject) {
 
 export function clearAll() {
   Object.values(KEYS).forEach(k => localStorage.removeItem(k))
+}
+
+// ─── Studio clients ────────────────────────────────────────────────────────────
+
+const DEFAULT_CHAT_NAMES = ['BaZi', 'Feng Shui', 'Qi Men', 'Luck Cycles', 'Notes']
+
+export function loadStudioClients(): StudioClient[] {
+  try { return JSON.parse(localStorage.getItem(KEYS.STUDIO_CLIENTS) ?? '[]') as StudioClient[] }
+  catch { return [] }
+}
+
+export function saveStudioClients(clients: StudioClient[]) {
+  localStorage.setItem(KEYS.STUDIO_CLIENTS, JSON.stringify(clients))
+}
+
+export function getOrCreateStudioClient(personId: string): StudioClient {
+  const clients = loadStudioClients()
+  const existing = clients.find(c => c.personId === personId)
+  if (existing) return existing
+
+  const now = new Date().toISOString().split('T')[0]
+  const newClient: StudioClient = {
+    personId,
+    chats: DEFAULT_CHAT_NAMES.map((name, i) => ({
+      id: `chat_${personId}_${i}_${Date.now()}`,
+      name,
+      isDefault: true,
+      messages: [],
+      updatedAt: now,
+    })),
+  }
+  saveStudioClients([...clients, newClient])
+  return newClient
+}
+
+export function saveStudioClient(client: StudioClient) {
+  const clients = loadStudioClients()
+  const idx = clients.findIndex(c => c.personId === client.personId)
+  if (idx === -1) clients.push(client)
+  else clients[idx] = client
+  saveStudioClients(clients)
+}
+
+export function addStudioSubChat(personId: string, name: string): ClientSubChat {
+  const client = getOrCreateStudioClient(personId)
+  const chat: ClientSubChat = {
+    id: `chat_${personId}_${Date.now()}`,
+    name,
+    isDefault: false,
+    messages: [],
+    updatedAt: new Date().toISOString().split('T')[0],
+  }
+  client.chats = [...client.chats, chat]
+  saveStudioClient(client)
+  return chat
+}
+
+export function deleteStudioSubChat(personId: string, chatId: string) {
+  const client = getOrCreateStudioClient(personId)
+  client.chats = client.chats.filter(c => c.id !== chatId || c.isDefault)
+  saveStudioClient(client)
+}
+
+// ─── Consultation drafts ────────────────────────────────────────────────────────
+
+export function loadConsultationDrafts(): ConsultationDraft[] {
+  try { return JSON.parse(localStorage.getItem(KEYS.STUDIO_DRAFTS) ?? '[]') as ConsultationDraft[] }
+  catch { return [] }
+}
+
+export function saveConsultationDraft(draft: ConsultationDraft) {
+  const drafts = loadConsultationDrafts()
+  const idx = drafts.findIndex(d => d.id === draft.id)
+  if (idx === -1) drafts.unshift(draft)
+  else drafts[idx] = draft
+  localStorage.setItem(KEYS.STUDIO_DRAFTS, JSON.stringify(drafts))
+}
+
+export function deleteConsultationDraft(id: string) {
+  const updated = loadConsultationDrafts().filter(d => d.id !== id)
+  localStorage.setItem(KEYS.STUDIO_DRAFTS, JSON.stringify(updated))
 }

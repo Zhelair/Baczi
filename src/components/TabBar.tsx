@@ -1,8 +1,8 @@
-import { Sun, BookOpen, Calendar, Settings, ShieldAlert, MessageCircle, Zap, Compass, Hexagon, GraduationCap, Clock, Users, ChevronLeft, ChevronRight, Lock } from 'lucide-react'
+import { Sun, BookOpen, Calendar, Settings, ShieldAlert, MessageCircle, Zap, Compass, Hexagon, GraduationCap, Clock, Users, ChevronLeft, ChevronRight, Lock, Wand2 } from 'lucide-react'
 import { t } from '../engine/translations'
 import type { Language, Tier } from '../engine/types'
 
-export type Tab = 'today' | 'chart' | 'lucky' | 'ask' | 'activations' | 'fengshui' | 'qmdj' | 'learn' | 'history' | 'persons' | 'settings' | 'admin'
+export type Tab = 'today' | 'chart' | 'lucky' | 'ask' | 'activations' | 'fengshui' | 'qmdj' | 'learn' | 'history' | 'persons' | 'settings' | 'admin' | 'studio'
 
 interface Props {
   active: Tab
@@ -36,7 +36,9 @@ export default function TabBar({ active, onSelect, lang, tier, collapsed, onTogg
   const isFreeTier = !tier || tier === 'free'
 
   const tabs = tier === 'admin'
-    ? [...BASE_TABS, { id: 'admin' as Tab, icon: ShieldAlert, labelKey: 'admin' }]
+    ? [...BASE_TABS, { id: 'studio' as Tab, icon: Wand2, labelKey: 'studio' }, { id: 'admin' as Tab, icon: ShieldAlert, labelKey: 'admin' }]
+    : tier === 'editor'
+    ? [...BASE_TABS, { id: 'studio' as Tab, icon: Wand2, labelKey: 'studio' }]
     : BASE_TABS
 
   const mobileTabs = tabs.filter(tab => MOBILE_TABS.includes(tab.id))
@@ -105,6 +107,7 @@ export default function TabBar({ active, onSelect, lang, tier, collapsed, onTogg
             const locked = isPaid && isFreeTier
             const isActive = active === id
             const isAdmin = id === 'admin'
+            const isStudio = id === 'studio'
 
             return (
               <button
@@ -117,10 +120,12 @@ export default function TabBar({ active, onSelect, lang, tier, collapsed, onTogg
                   isActive
                     ? isAdmin
                       ? 'bg-red-950/40 text-red-400 border border-red-900/50'
+                      : isStudio
+                      ? 'border border-violet-500/20 text-violet-400'
                       : 'border border-amber-500/20 text-amber-400'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 border border-transparent'
                 }`}
-                style={isActive && !isAdmin ? { background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-amber-500) 12%, transparent), color-mix(in srgb, var(--color-amber-500) 6%, transparent))' } : undefined}
+                style={isActive && !isAdmin ? { background: isStudio ? 'linear-gradient(135deg, color-mix(in srgb, #a78bfa 12%, transparent), color-mix(in srgb, #a78bfa 6%, transparent))' : 'linear-gradient(135deg, color-mix(in srgb, var(--color-amber-500) 12%, transparent), color-mix(in srgb, var(--color-amber-500) 6%, transparent))' } : undefined}
               >
                 <div className="relative flex-shrink-0">
                   <Icon size={17} />
